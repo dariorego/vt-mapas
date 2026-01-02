@@ -325,15 +325,25 @@
                     }).addTo(map);
 
                     // Ícones
-                    const startIcon = L.icon({
-                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/markers/marker-icon-2x-red.png',
-                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                        iconSize: [25, 41],
-                        iconAnchor: [12, 41],
-                        popupAnchor: [1, -34],
-                        shadowSize: [41, 41]
+                    // Ícone Bandeira Início 🚩
+                    const startIcon = L.divIcon({
+                        className: 'custom-flag-icon',
+                        html: '<div style="font-size: 32px; filter: drop-shadow(2px 4px 6px black);">🚩</div>',
+                        iconSize: [40, 40],
+                        iconAnchor: [5, 40],
+                        popupAnchor: [10, -35]
                     });
 
+                    // Ícone Bandeira Fim (Chegada) 🏁
+                    const endIcon = L.divIcon({
+                        className: 'custom-flag-icon',
+                        html: '<div style="font-size: 32px; filter: drop-shadow(2px 4px 6px black);">🏁</div>',
+                        iconSize: [40, 40],
+                        iconAnchor: [5, 40],
+                        popupAnchor: [10, -35]
+                    });
+
+                    // Ícone Numérico Padrão
                     const deliveryIcon = L.divIcon({
                         className: 'custom-div-icon',
                         html: "<div style='background-color:#1F6F50; color:white; border-radius:50%; width:25px; height:25px; display:flex; justify-content:center; align-items:center; font-weight:bold; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3);'>%ORD%</div>",
@@ -344,31 +354,39 @@
                     // Marcador Inicial
                     L.marker([startPoint.latitude, startPoint.longitude], {icon: startIcon})
                      .addTo(map)
-                     .bindPopup(`<b>${startPoint.nome}</b><br>Ponto de Partida`);
+                     .bindPopup(`<b>${startPoint.nome}</b><br>🚩 Ponto de Partida`);
 
                     const latlngs = [[startPoint.latitude, startPoint.longitude]];
 
                     // Marcadores da Rota
-                    routePoints.forEach(point => {
+                    routePoints.forEach((point, index) => {
                         const lat = parseFloat(point.latitude);
                         const lng = parseFloat(point.longitude);
+                        const isLast = index === routePoints.length - 1;
                         
-                        // Cria ícone numerado
-                        const iconHtml = deliveryIcon.options.html.replace('%ORD%', point.ordem);
-                        const numIcon = L.divIcon({
-                            className: 'custom-marker',
-                            html: iconHtml,
-                            iconSize: [30, 30],
-                            iconAnchor: [15, 15]
-                        });
+                        let iconToUse;
 
-                        L.marker([lat, lng], {icon: numIcon})
+                        if (isLast) {
+                            iconToUse = endIcon;
+                        } else {
+                            // Cria ícone numerado
+                            const iconHtml = deliveryIcon.options.html.replace('%ORD%', point.ordem);
+                            iconToUse = L.divIcon({
+                                className: 'custom-marker',
+                                html: iconHtml,
+                                iconSize: [30, 30],
+                                iconAnchor: [15, 15]
+                            });
+                        }
+
+                        let popupContent = `<b>${point.ordem}. ${point.cliente_nome || 'Cliente ' + point.cliente_id}</b><br>`;
+                        if (isLast) popupContent += `🏁 <b>Última Entrega (Próx. ao Motorista)</b><br>`;
+                        popupContent += `${point.situacao_descricao || ''}<br>`;
+                        popupContent += `Distância: ${point.distancia} km`;
+
+                        L.marker([lat, lng], {icon: iconToUse})
                          .addTo(map)
-                         .bindPopup(`
-                            <b>${point.ordem}. ${point.cliente_nome || 'Cliente ' + point.cliente_id}</b><br>
-                            ${point.situacao_descricao || ''}<br>
-                            Distância: ${point.distancia} km
-                         `);
+                         .bindPopup(popupContent);
                          
                         latlngs.push([lat, lng]);
                     });

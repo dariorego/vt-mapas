@@ -121,6 +121,8 @@ class RouteOptimizer
                     rs.descricao as situacao_descricao, 
                     r.motorista_id, 
                     m.nome as motorista_nome,
+                    m.latitude as motorista_lat,
+                    m.longitude as motorista_lon,
                     r.data_remessa,  
                     r.coordenadas, 
                     r.latitude, 
@@ -142,9 +144,7 @@ class RouteOptimizer
         ]);
 
         if (empty($this->deliveryPoints)) {
-            // Se não encontrar por viagem_id, tenta buscar uma viagem ativa para debug
-            debug_log("Nenhum ponto encontrado para viagem_id {$viagemId}. Buscando sugestões...");
-
+            debug_log("Nenhum ponto encontrado para viagem_id {$viagemId}.");
             throw new Exception("Nenhum ponto de entrega encontrado para a viagem ID {$viagemId}!");
         }
 
@@ -153,10 +153,12 @@ class RouteOptimizer
     }
 
     /**
-     * Otimiza a rota usando o algoritmo Nearest Neighbor (Vizinho Mais Próximo)
+     * Otimiza a rota usando o algoritmo Nearest Neighbor com Ponto Final Otimizado
      * 
-     * Este algoritmo sempre escolhe o próximo ponto não visitado mais próximo do ponto atual.
-     * É uma heurística que fornece bons resultados para problemas de roteamento.
+     * O algoritmo define:
+     * 1. Ponto Inicial (Fixo)
+     * 2. Ponto Final (Entrega mais próxima da casa do motorista)
+     * 3. Ordena os demais pontos usando Nearest Neighbor entre o início e o ponto final
      * 
      * @return array Rota otimizada com ordem de entrega
      */
@@ -168,22 +170,49 @@ class RouteOptimizer
 
         $unvisited = $this->deliveryPoints;
         $route = [];
+
+        // 1. Identificar o ponto de destino final (Mais próximo do motorista)
+        // Assume-se que todos os pontos da mesma viagem têm o mesmo motorista
+        $firstPoint = reset($unvisited);
+        $driverLat = $firstPoint['motorista_lat'] ?? null;
+        $driverLon = $firstPoint['motorista_lon'] ?? null;
+
+        $finalPointIndex = null;
+
+        if ($driverLat && $driverLon) {
+            $minDistToDriver = PHP_FLOAT_MAX;
+
+            foreach ($unvisited as $index => $point) {
+                $dist = $this->calculateDistance($point['latitude'], $point['longitude'], $driverLat, $driverLon);
+                if ($dist < $minDistToDriver) {
+                    $minDistToDriver = $dist;
+                    $finalPointIndex = $index;
+                }
+            }
+            debug_log("Ponto final definido (Mais próximo do motorista): ID {$unvisited[$finalPointIndex]['id']} a {$minDistToDriver} km do motorista.");
+        }
+
+        // Se encontrou um ponto final, remove ele da lista de 'visitáveis agora' para adicionar só no final
+        $finalPoint = null;
+        if ($finalPointIndex !== null) {
+            $finalPoint = $unvisited[$finalPointIndex];
+            array_splice($unvisited, $finalPointIndex, 1); // Remove da lista temporária
+        }
+
+        // 2. Executar Nearest Neighbor padrão nos pontos restantes
         $currentPoint = [
             'latitude' => $this->startingPoint['latitude'],
             'longitude' => $this->startingPoint['longitude']
         ];
-
         $this->totalDistance = 0;
         $ordem = 1;
 
-        debug_log("Iniciando otimização de rota com " . count($unvisited) . " pontos...");
+        debug_log("Iniciando otimização...");
 
-        // Algoritmo Nearest Neighbor
         while (!empty($unvisited)) {
             $nearestIndex = null;
             $nearestDistance = PHP_FLOAT_MAX;
 
-            // Encontra o ponto não visitado mais próximo
             foreach ($unvisited as $index => $point) {
                 $distance = $this->calculateDistance(
                     $currentPoint['latitude'],
@@ -198,7 +227,6 @@ class RouteOptimizer
                 }
             }
 
-            // Adiciona o ponto mais próximo à rota
             $nearestPoint = $unvisited[$nearestIndex];
             $nearestPoint['ordem'] = $ordem;
             $nearestPoint['distancia'] = $nearestDistance;
@@ -206,7 +234,6 @@ class RouteOptimizer
             $route[] = $nearestPoint;
             $this->totalDistance += $nearestDistance;
 
-            // Atualiza o ponto atual e remove da lista de não visitados
             $currentPoint = [
                 'latitude' => $nearestPoint['latitude'],
                 'longitude' => $nearestPoint['longitude']
@@ -216,14 +243,27 @@ class RouteOptimizer
             $ordem++;
         }
 
-        $this->optimizedRoute = $route;
+        // 3. Adicionar o ponto final (se existir)
+        if ($finalPoint) {
+            $distToFinal = $this->calculateDistance(
+                $currentPoint['latitude'],
+                $currentPoint['longitude'],
+                $finalPoint['latitude'],
+                $finalPoint['longitude']
+            );
 
-        // Calcula tempo estimado
-        $this->estimatedTime = round(($this->totalDistance / AVG_SPEED_KMH) * 60); // em minutos
+            $finalPoint['ordem'] = $ordem;
+            $finalPoint['distancia'] = $distToFinal;
+
+            $route[] = $finalPoint;
+            $this->totalDistance += $distToFinal;
+        }
+
+        $this->optimizedRoute = $route;
+        $this->estimatedTime = round(($this->totalDistance / AVG_SPEED_KMH) * 60);
 
         debug_log("Otimização concluída!");
         debug_log("Distância total: {$this->totalDistance} km");
-        debug_log("Tempo estimado: {$this->estimatedTime} minutos");
 
         return $this->optimizedRoute;
     }
