@@ -354,6 +354,34 @@ class RouteOptimizer
     }
 
     /**
+     * Valida a rota copiando os valores de ordem_auto para ordem
+     * 
+     * @param int $viagemId ID da viagem
+     * @return int Número de registros atualizados
+     */
+    public function validateRoute($viagemId)
+    {
+        $query = "UPDATE remessa 
+                  SET ordem = ordem_auto 
+                  WHERE viagem_id = :viagem_id 
+                  AND ordem_auto IS NOT NULL";
+
+        $this->db->execute($query, ['viagem_id' => $viagemId]);
+
+        // Busca quantos registros foram afetados
+        $countQuery = "SELECT COUNT(*) as total 
+                       FROM remessa 
+                       WHERE viagem_id = :viagem_id 
+                       AND ordem = ordem_auto";
+
+        $result = $this->db->queryOne($countQuery, ['viagem_id' => $viagemId]);
+
+        debug_log("Rota validada! {$result['total']} registros atualizados para viagem {$viagemId}.");
+
+        return $result['total'] ?? 0;
+    }
+
+    /**
      * Exibe um resumo da rota otimizada
      */
     public function displayRouteSummary()
