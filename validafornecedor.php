@@ -2,20 +2,28 @@
 /**
  * Validação de Fornecedores
  * 
- * Aplicação otimizada para dispositivos móveis.
+ * Visualiza entregas agrupadas por cliente com fornecedores em grid.
  */
+
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
+}
 
 require_once 'config.php';
 require_once 'Database.php';
 
 $db = new Database();
 $fornecedores = [];
+$clientes = [];
 $resultados = [];
 $filtroDataInicio = $_POST['data_inicio'] ?? $_GET['data_inicio'] ?? '';
 $filtroDataFim = $_POST['data_fim'] ?? $_GET['data_fim'] ?? '';
 $filtroFornecedor = $_POST['fornecedor_id'] ?? '';
+$filtroCliente = $_POST['cliente_id'] ?? '';
 
-// AJAX handlers
+// AJAX: Atualiza status (1 -> 6)
 if (isset($_POST['ajax']) && $_POST['ajax'] === 'atualizar_status') {
     header('Content-Type: application/json');
     try {
@@ -26,13 +34,14 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'atualizar_status') {
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         $sql = "UPDATE prod_vt.remessa_valor SET remessa_situacao_id = 6 WHERE id IN ($placeholders) AND remessa_situacao_id = 1";
         $updated = $db->execute($sql, $ids);
-        echo json_encode(['success' => true, 'message' => "$updated atualizado(s)!", 'updated' => $updated]);
+        echo json_encode(['success' => true, 'message' => "$updated confirmado(s)!", 'updated' => $updated]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
     exit;
 }
 
+// AJAX: Desfaz (6 -> 1)
 if (isset($_POST['ajax']) && $_POST['ajax'] === 'desfazer_entrega') {
     header('Content-Type: application/json');
     try {
@@ -50,6 +59,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'desfazer_entrega') {
     exit;
 }
 
+// AJAX: Busca fornecedores por data
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'fornecedores') {
     header('Content-Type: application/json');
     try {
@@ -74,18 +84,47 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fornecedores') {
     exit;
 }
 
+// AJAX: Busca clientes por data
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'clientes') {
+    header('Content-Type: application/json');
+    try {
+        $params = [];
+        $sql = "SELECT DISTINCT c.id, c.nome FROM prod_vt.remessa_valor rv
+                LEFT JOIN prod_vt.cliente c ON c.id = rv.cliente_id 
+                LEFT JOIN prod_vt.viagem v ON v.id = rv.remessa_viagem_id WHERE c.id IS NOT NULL";
+        if (!empty($_GET['data_inicio'])) {
+            $sql .= " AND DATE(v.data_viagem) >= :data_inicio";
+            $params[':data_inicio'] = $_GET['data_inicio'];
+        }
+        if (!empty($_GET['data_fim'])) {
+            $sql .= " AND DATE(v.data_viagem) <= :data_fim";
+            $params[':data_fim'] = $_GET['data_fim'];
+        }
+        $sql .= " ORDER BY c.nome";
+        $clientes = $db->query($sql, $params);
+        echo json_encode(['success' => true, 'data' => $clientes]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// Carrega listas iniciais
 try {
     $fornecedores = $db->query("SELECT id, descricao FROM prod_vt.fornecedor ORDER BY descricao");
+    $clientes = $db->query("SELECT id, nome FROM prod_vt.cliente ORDER BY nome LIMIT 500");
 } catch (Exception $e) {
 }
 
+// Processa filtro
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
     try {
         $params = [];
         $whereConditions = [];
-        $sql = "SELECT rv.id, rv.valor, rv.remessa_id, r.viagem_id, v.data_viagem, rv.remessa_viagem_id, rv.qde, rv.cliente_id, c.nome AS cliente_nome, rv.fornecedor_id, f.descricao AS fornecedor_descricao, rv.remessa_situacao_id, rs.descricao AS situacao_descricao
+        $sql = "SELECT rv.id, rv.qde, rv.cliente_id, c.nome AS cliente_nome, c.fone AS cliente_telefone,
+                rv.fornecedor_id, f.descricao AS fornecedor_descricao, rv.remessa_situacao_id, 
+                rs.descricao AS situacao_descricao, v.data_viagem
                 FROM prod_vt.remessa_valor rv
-                LEFT JOIN prod_vt.remessa r ON r.id = rv.remessa_id 
                 LEFT JOIN prod_vt.cliente c ON c.id = rv.cliente_id 
                 LEFT JOIN prod_vt.fornecedor f ON f.id = rv.fornecedor_id 
                 LEFT JOIN prod_vt.remessa_situacao rs ON rs.id = rv.remessa_situacao_id 
@@ -103,14 +142,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
             $whereConditions[] = "rv.fornecedor_id = :fornecedor_id";
             $params[':fornecedor_id'] = $filtroFornecedor;
         }
+        if (!empty($filtroCliente)) {
+            $whereConditions[] = "rv.cliente_id = :cliente_id";
+            $params[':cliente_id'] = $filtroCliente;
+        }
         if (!empty($whereConditions)) {
             $sql .= " WHERE " . implode(" AND ", $whereConditions);
         }
-        $sql .= " ORDER BY v.data_viagem DESC, f.descricao, c.nome";
+        $sql .= " ORDER BY c.nome, f.descricao";
         $resultados = $db->query($sql, $params);
     } catch (Exception $e) {
         $erro = $e->getMessage();
     }
+}
+
+// Agrupa resultados por cliente
+$clientesAgrupados = [];
+foreach ($resultados as $row) {
+    $clienteId = $row['cliente_id'];
+    if (!isset($clientesAgrupados[$clienteId])) {
+        $clientesAgrupados[$clienteId] = [
+            'nome' => $row['cliente_nome'] ?? 'N/D',
+            'telefone' => $row['cliente_telefone'] ?? '',
+            'fornecedores' => []
+        ];
+    }
+    $clientesAgrupados[$clienteId]['fornecedores'][] = [
+        'id' => $row['id'],
+        'nome' => $row['fornecedor_descricao'] ?? 'N/D',
+        'qde' => $row['qde'],
+        'situacao_id' => $row['remessa_situacao_id'],
+        'situacao' => $row['situacao_descricao']
+    ];
 }
 ?>
 <!DOCTYPE html>
@@ -120,29 +183,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
     <title>Validar Fornecedor</title>
     <style>
         :root {
-            --primary: #1F6F50;
-            --primary-dark: #16523c;
-            --secondary: #2c3e50;
-            --bg: #f4f7f6;
+            /* Nova paleta - mais elegante e menos saturada */
+            --primary: #1F6F54;
+            --primary-light: #2F8F6B;
+            --primary-bg: #E8F4EF;
+            --secondary: #3B82F6;
+            --success: #22C55E;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --bg: #F6F8F9;
             --card: #ffffff;
-            --text: #333;
-            --success: #28a745;
-            --warning: #ffc107;
-            --danger: #dc3545;
+            --text: #1F2933;
+            --text-muted: #6B7280;
+            --border: #E5E7EB;
         }
 
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-        }
-
-        html {
-            font-size: 16px;
         }
 
         body {
@@ -164,7 +226,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
             display: flex;
             align-items: center;
             padding: 0 12px;
-            z-index: 100;
+            z-index: 2000;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
         }
 
@@ -182,10 +244,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
             border-radius: 8px;
         }
 
-        .menu-btn:active {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
         .header-title {
             flex: 1;
             font-size: 1.1rem;
@@ -193,7 +251,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
             margin-left: 8px;
         }
 
-        /* Sidebar Overlay */
+        /* Sidebar */
         .sidebar-overlay {
             position: fixed;
             top: 0;
@@ -201,7 +259,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
             right: 0;
             bottom: 0;
             background: rgba(0, 0, 0, 0.5);
-            z-index: 200;
+            z-index: 2100;
             opacity: 0;
             visibility: hidden;
             transition: all 0.3s;
@@ -212,20 +270,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
             visibility: visible;
         }
 
-        /* Sidebar */
+        /* Sidebar - Novo Design em Duas Colunas */
         .sidebar {
             position: fixed;
             top: 0;
             left: 0;
-            width: 280px;
+            width: 240px;
             max-width: 85vw;
             height: 100vh;
-            background: linear-gradient(180deg, var(--primary) 0%, var(--primary-dark) 100%);
-            z-index: 300;
+            background: #ffffff;
+            z-index: 2200;
             transform: translateX(-100%);
-            transition: transform 0.3s ease;
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
+            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.15);
         }
 
         .sidebar.open {
@@ -233,66 +292,130 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
         }
 
         .sidebar-header {
-            padding: 20px 16px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            background: var(--primary);
         }
 
-        .sidebar-header h2 {
+        .sidebar-header-icon {
+            width: 60px;
+            min-width: 60px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar-header-icon span {
             color: white;
-            font-size: 1.2rem;
-            font-weight: 600;
+            font-size: 1.3rem;
         }
 
-        .sidebar-header p {
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.8rem;
-            margin-top: 4px;
+        .sidebar-header-title {
+            flex: 1;
+            padding: 0 16px;
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .sidebar-nav {
             flex: 1;
-            padding: 12px 0;
+            overflow-y: auto;
         }
 
         .nav-item {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 14px 16px;
-            color: white;
             text-decoration: none;
-            font-size: 1rem;
-            border-left: 3px solid transparent;
             transition: all 0.2s;
+            border-bottom: 1px solid var(--border);
         }
 
-        .nav-item:active,
-        .nav-item.active {
-            background: rgba(255, 255, 255, 0.1);
-            border-left-color: white;
+        .nav-item .icon-col {
+            width: 60px;
+            min-width: 60px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f8f9fa;
+            border-right: 1px solid var(--border);
         }
 
-        .nav-item .icon {
+        .nav-item .icon-col span {
             font-size: 1.3rem;
-            width: 28px;
-            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .nav-item .label-col {
+            flex: 1;
+            padding: 0 16px;
+            font-size: 0.95rem;
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        .nav-item:hover .icon-col {
+            background: var(--primary-bg);
+        }
+
+        .nav-item:hover .label-col {
+            color: var(--primary);
+        }
+
+        .nav-item.active .icon-col {
+            background: var(--primary);
+        }
+
+        .nav-item.active .icon-col span {
+            color: white;
+        }
+
+        .nav-item.active .label-col {
+            background: var(--primary);
+            color: white;
         }
 
         .sidebar-footer {
-            padding: 12px 16px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            color: rgba(255, 255, 255, 0.5);
+            display: flex;
+            align-items: center;
+            border-top: 1px solid var(--border);
+        }
+
+        .sidebar-footer .icon-col {
+            width: 60px;
+            min-width: 60px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f8f9fa;
+            border-right: 1px solid var(--border);
+        }
+
+        .sidebar-footer .icon-col span {
+            font-size: 1.3rem;
+            color: var(--text-muted);
+        }
+
+        .sidebar-footer .label-col {
+            flex: 1;
+            padding: 8px 16px;
             font-size: 0.75rem;
-            text-align: center;
+            color: var(--text-muted);
         }
 
-        /* Main Content */
+        /* Main */
         .main {
-            padding: 68px 12px 80px 12px;
+            padding: 68px 12px 20px 12px;
         }
 
-        /* Cards & Form */
-        .card {
+        /* Filter Card */
+        .filter-card {
             background: var(--card);
             border-radius: 12px;
             padding: 16px;
@@ -300,37 +423,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
 
-        .form-row {
+        .filter-row {
             display: flex;
             gap: 8px;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
 
-        .form-group {
+        .filter-group {
             flex: 1;
         }
 
-        .form-group label {
+        .filter-group label {
             display: block;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: 600;
             color: var(--secondary);
-            margin-bottom: 4px;
+            margin-bottom: 3px;
             text-transform: uppercase;
         }
 
-        .form-group input,
-        .form-group select {
+        .filter-group input,
+        .filter-group select {
             width: 100%;
-            padding: 12px;
+            padding: 10px;
             border: 1px solid #ddd;
             border-radius: 8px;
-            font-size: 1rem;
+            font-size: 0.9rem;
             -webkit-appearance: none;
         }
 
-        .form-group select {
-            background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 8L1 3h10z'/%3E%3C/svg%3E") no-repeat right 12px center;
+        /* Autocomplete */
+        .autocomplete-wrapper {
+            position: relative;
+        }
+
+        .autocomplete-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .autocomplete-list.active {
+            display: block;
+        }
+
+        .autocomplete-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        .autocomplete-item:hover,
+        .autocomplete-item.selected {
+            background: var(--bg);
+        }
+
+        .autocomplete-item .highlight {
+            background: #fff3cd;
+            font-weight: 600;
         }
 
         .btn-row {
@@ -340,22 +505,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
 
         .btn {
             flex: 1;
-            padding: 14px;
+            padding: 12px;
             border: none;
             border-radius: 8px;
-            font-size: 1rem;
+            font-size: 0.95rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
         }
 
         .btn-primary {
             background: var(--primary);
             color: white;
-        }
-
-        .btn-primary:active {
-            background: var(--primary-dark);
         }
 
         .btn-secondary {
@@ -365,198 +525,188 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
 
         /* Stats */
         .stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            display: flex;
             gap: 8px;
             margin-bottom: 12px;
         }
 
         .stat {
+            flex: 1;
             background: var(--card);
             border-radius: 10px;
-            padding: 12px 8px;
+            padding: 10px 8px;
             text-align: center;
             border-left: 3px solid var(--primary);
         }
 
         .stat .num {
-            font-size: 1.5rem;
+            font-size: 1.3rem;
             font-weight: 700;
             color: var(--primary);
         }
 
         .stat .lbl {
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             color: #666;
-            margin-top: 2px;
         }
 
-        /* Action Bar */
-        .action-bar {
-            background: var(--primary);
-            color: white;
-            padding: 10px 12px;
-            border-radius: 10px;
-            margin-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 8px;
+        /* Client Card - Design Clean */
+        .client-card {
+            background: var(--card);
+            border-radius: 12px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            overflow: hidden;
+            border-left: 4px solid var(--primary-light);
         }
 
-        .action-bar .count {
+        .client-header {
+            background: #ffffff;
+            color: var(--text);
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .client-name {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text);
+        }
+
+        .client-phone {
             font-size: 0.85rem;
-            opacity: 0.9;
+            color: var(--text-muted);
+            margin-top: 4px;
         }
 
-        .action-btns {
+        .client-phone a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        /* Fornecedor Grid */
+        .fornecedor-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1px;
+            background: #eee;
+        }
+
+        .fornecedor-item {
+            background: white;
+            padding: 12px;
             display: flex;
+            flex-direction: column;
             gap: 6px;
         }
 
-        .action-btn {
-            padding: 8px 12px;
-            border: none;
-            border-radius: 6px;
-            font-size: 0.8rem;
+        .fornecedor-item.pendente {
+            border-left: 3px solid var(--warning);
+        }
+
+        .fornecedor-item.entregue {
+            border-left: 3px solid var(--success);
+            background: #f8fff8;
+        }
+
+        .fornecedor-nome {
             font-weight: 600;
-            cursor: pointer;
-        }
-
-        .action-btn:disabled {
-            opacity: 0.5;
-        }
-
-        .btn-mark {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-        }
-
-        .btn-confirm {
-            background: var(--success);
-            color: white;
-        }
-
-        /* List Items */
-        .list {
-            background: var(--card);
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .list-item {
-            padding: 14px;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .list-item:last-child {
-            border-bottom: none;
-        }
-
-        .list-item.selected {
-            background: #e8f5e9;
-        }
-
-        .list-item .check {
-            width: 24px;
-            height: 24px;
-            flex-shrink: 0;
-        }
-
-        .list-item .check input {
-            width: 22px;
-            height: 22px;
-            cursor: pointer;
-        }
-
-        .list-item .info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .list-item .client {
-            font-weight: 600;
-            font-size: 0.95rem;
+            font-size: 0.85rem;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
-        .list-item .meta {
+        .fornecedor-qde {
             font-size: 0.8rem;
             color: #666;
-            margin-top: 2px;
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
         }
 
-        .list-item .actions {
+        .fornecedor-qde strong {
+            color: var(--primary);
+        }
+
+        .fornecedor-action {
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 26px;
             flex-shrink: 0;
         }
 
-        .item-btn {
-            width: 44px;
-            height: 44px;
-            border: none;
-            border-radius: 10px;
-            font-size: 1.3rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
         }
 
-        .item-btn.confirm {
-            background: #d4edda;
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #dc3545;
+            transition: 0.3s;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+        }
+
+        input:checked+.slider {
+            background-color: var(--success);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(24px);
+        }
+
+        .slider.round {
+            border-radius: 26px;
+        }
+
+        .slider.round:before {
+            border-radius: 50%;
+        }
+
+        .status-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #666;
+        }
+
+        .status-label.entregue {
             color: var(--success);
         }
 
-        .item-btn.confirm:active {
-            background: var(--success);
-            color: white;
-        }
-
-        .item-btn.undo {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .item-btn.undo:active {
-            background: var(--warning);
-            color: white;
-        }
-
-        /* Badge */
-        .badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 10px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .badge-pending {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .badge-done {
-            background: #d4edda;
-            color: #155724;
+        .status-label.pendente {
+            color: #dc3545;
         }
 
         /* Alert */
         .alert {
-            padding: 14px;
+            padding: 12px;
             border-radius: 10px;
             margin-bottom: 12px;
             font-size: 0.9rem;
+            text-align: center;
         }
 
         .alert-success {
@@ -572,6 +722,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
         .alert-danger {
             background: #f8d7da;
             color: #721c24;
+        }
+
+        /* Empty */
+        .empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+
+        .empty .icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
         }
 
         /* Modal */
@@ -622,23 +784,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
             flex: 1;
         }
 
-        /* Empty State */
-        .empty {
-            text-align: center;
-            padding: 40px 20px;
-            color: #666;
-        }
-
-        .empty .icon {
-            font-size: 3rem;
-            margin-bottom: 12px;
-        }
-
-        /* Loading */
         .loading {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: #666;
-            margin-top: 4px;
+            margin-top: 3px;
             display: none;
         }
 
@@ -646,71 +795,84 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
             display: block;
         }
 
-        /* Hide desktop sidebar include */
-        .page-with-sidebar {
-            margin-left: 0 !important;
+        /* Responsive - 3 cols em telas maiores */
+        @media (min-width: 500px) {
+            .fornecedor-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (min-width: 768px) {
+            .fornecedor-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 
 <body>
-    <!-- Mobile Header -->
     <header class="mobile-header">
         <button class="menu-btn" onclick="toggleMenu()">☰</button>
         <span class="header-title">📦 Validar Fornecedor</span>
     </header>
 
-    <!-- Sidebar Overlay -->
     <div class="sidebar-overlay" id="overlay" onclick="closeMenu()"></div>
-
-    <!-- Sidebar -->
     <nav class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <h2>🚚 Victor Transportes</h2>
             <p>Sistema de Gestão</p>
         </div>
         <div class="sidebar-nav">
-            <a href="index.php" class="nav-item">
-                <span class="icon">🏠</span> Início
-            </a>
-            <a href="gerarrota.php" class="nav-item">
-                <span class="icon">🗺️</span> Gerar Rota
-            </a>
-            <a href="validafornecedor.php" class="nav-item active">
-                <span class="icon">📦</span> Validar Fornecedor
-            </a>
+            <a href="index.php" class="nav-item"><span class="icon">🏠</span> Início</a>
+            <a href="gerarrota.php" class="nav-item"><span class="icon">🗺️</span> Gerar Rota</a>
+            <a href="validafornecedor.php" class="nav-item active"><span class="icon">📦</span> Validar Fornecedor</a>
+            <?php if (!empty($_SESSION['user_is_admin'])): ?>
+                <a href="sobre.php" class="nav-item"><span class="icon">ℹ️</span> Sobre</a>
+            <?php endif; ?>
+            <a href="logout.php" class="nav-item"><span class="icon">🚪</span> Sair</a>
         </div>
         <div class="sidebar-footer">© 2026 Victor Transportes</div>
     </nav>
 
-    <!-- Main Content -->
     <main class="main">
-        <!-- Filter Form -->
-        <div class="card">
+        <div class="filter-card">
             <form method="POST" action="">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Data Início</label>
-                        <input type="date" name="data_inicio" id="data_inicio"
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label>Data Início *</label>
+                        <input type="date" name="data_inicio" id="data_inicio" required
                             value="<?php echo htmlspecialchars($filtroDataInicio); ?>">
                     </div>
-                    <div class="form-group">
-                        <label>Data Fim</label>
-                        <input type="date" name="data_fim" id="data_fim"
+                    <div class="filter-group">
+                        <label>Data Fim *</label>
+                        <input type="date" name="data_fim" id="data_fim" required
                             value="<?php echo htmlspecialchars($filtroDataFim); ?>">
                     </div>
                 </div>
-                <div class="form-group" style="margin-bottom: 12px;">
-                    <label>Fornecedor</label>
-                    <select name="fornecedor_id" id="fornecedor_id">
-                        <option value="">Todos os Fornecedores</option>
-                        <?php foreach ($fornecedores as $f): ?>
-                            <option value="<?php echo $f['id']; ?>" <?php echo ($filtroFornecedor == $f['id']) ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($f['descricao']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <div class="loading" id="loading">🔄 Carregando...</div>
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label>Fornecedor</label>
+                        <div class="autocomplete-wrapper">
+                            <input type="text" id="fornecedor_search" placeholder="Digite para buscar..."
+                                autocomplete="off">
+                            <input type="hidden" name="fornecedor_id" id="fornecedor_id"
+                                value="<?php echo htmlspecialchars($filtroFornecedor); ?>">
+                            <div class="autocomplete-list" id="fornecedor_list"></div>
+                        </div>
+                        <div class="loading" id="loadingF">🔄</div>
+                    </div>
+                    <div class="filter-group">
+                        <label>Cliente</label>
+                        <div class="autocomplete-wrapper">
+                            <input type="text" id="cliente_search" placeholder="Digite para buscar..."
+                                autocomplete="off">
+                            <input type="hidden" name="cliente_id" id="cliente_id"
+                                value="<?php echo htmlspecialchars($filtroCliente); ?>">
+                            <div class="autocomplete-list" id="cliente_list"></div>
+                        </div>
+                        <div class="loading" id="loadingC">🔄</div>
+                    </div>
                 </div>
                 <div class="btn-row">
                     <button type="submit" name="filtrar" class="btn btn-primary">Filtrar</button>
@@ -721,81 +883,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
             </form>
         </div>
 
-        <!-- Alert -->
         <div class="alert alert-success" id="alertSuccess" style="display:none;"></div>
         <?php if (isset($erro)): ?>
             <div class="alert alert-danger"><?php echo htmlspecialchars($erro); ?></div>
         <?php endif; ?>
 
-        <?php if (!empty($resultados)): ?>
+        <?php if (!empty($clientesAgrupados)): ?>
             <?php
-            $total = count($resultados);
-            $totalQde = array_sum(array_column($resultados, 'qde'));
-            $pendentes = count(array_filter($resultados, fn($r) => $r['remessa_situacao_id'] == 1));
+            $totalClientes = count($clientesAgrupados);
+            $totalFornecedores = count($resultados);
+            $totalPendentes = count(array_filter($resultados, fn($r) => $r['remessa_situacao_id'] == 1));
             ?>
-
-            <!-- Stats -->
             <div class="stats">
                 <div class="stat">
-                    <div class="num"><?php echo $total; ?></div>
-                    <div class="lbl">Total</div>
+                    <div class="num"><?php echo $totalClientes; ?></div>
+                    <div class="lbl">Clientes</div>
                 </div>
                 <div class="stat">
-                    <div class="num"><?php echo $pendentes; ?></div>
+                    <div class="num"><?php echo $totalFornecedores; ?></div>
+                    <div class="lbl">Itens</div>
+                </div>
+                <div class="stat">
+                    <div class="num"><?php echo $totalPendentes; ?></div>
                     <div class="lbl">Pendentes</div>
                 </div>
-                <div class="stat">
-                    <div class="num"><?php echo $totalQde; ?></div>
-                    <div class="lbl">Qtde</div>
+                <div class="stat" style="cursor:pointer; background:var(--primary); border-left-color:#fff;"
+                    onclick="generatePDF()">
+                    <div class="num" style="color:#fff; font-size:1.1rem;">📄</div>
+                    <div class="lbl" style="color:#fff;">Baixar PDF</div>
                 </div>
             </div>
 
-            <!-- Action Bar -->
-            <div class="action-bar">
-                <span class="count" id="selectedCount">0 selecionado(s)</span>
-                <div class="action-btns">
-                    <button class="action-btn btn-mark" id="btnToggle" onclick="toggleAll()">☑️</button>
-                    <button class="action-btn btn-confirm" id="btnConfirm" disabled onclick="confirmarLote()">✅
-                        Confirmar</button>
-                </div>
-            </div>
-
-            <!-- List -->
-            <div class="list">
-                <?php foreach ($resultados as $row): ?>
-                    <?php
-                    $isPendente = ($row['remessa_situacao_id'] == 1);
-                    $isEntregue = ($row['remessa_situacao_id'] == 6);
-                    ?>
-                    <div class="list-item" data-id="<?php echo $row['id']; ?>"
-                        data-status="<?php echo $row['remessa_situacao_id']; ?>">
-                        <div class="check">
-                            <?php if ($isPendente): ?>
-                                <input type="checkbox" class="row-check" value="<?php echo $row['id']; ?>" onchange="updateCount()">
-                            <?php endif; ?>
-                        </div>
-                        <div class="info">
-                            <div class="client"><?php echo htmlspecialchars($row['cliente_nome'] ?? 'N/D'); ?></div>
-                            <div class="meta">
-                                <span><?php echo $row['data_viagem'] ? date('d/m', strtotime($row['data_viagem'])) : '-'; ?></span>
-                                <span>Qtd: <?php echo $row['qde']; ?></span>
-                                <span class="badge <?php echo $isPendente ? 'badge-pending' : 'badge-done'; ?>">
-                                    <?php echo $isPendente ? 'Pendente' : 'Entregue'; ?>
-                                </span>
+            <?php foreach ($clientesAgrupados as $clienteId => $cliente): ?>
+                <div class="client-card">
+                    <div class="client-header">
+                        <div class="client-name"><?php echo htmlspecialchars($cliente['nome']); ?></div>
+                        <?php if (!empty($cliente['telefone'])): ?>
+                            <div class="client-phone">
+                                <a href="tel:<?php echo preg_replace('/\D/', '', $cliente['telefone']); ?>">
+                                    📞 <?php echo htmlspecialchars($cliente['telefone']); ?>
+                                </a>
                             </div>
-                        </div>
-                        <div class="actions">
-                            <?php if ($isPendente): ?>
-                                <button class="item-btn confirm" onclick="confirmarUm(<?php echo $row['id']; ?>)"
-                                    title="Confirmar">✓</button>
-                            <?php elseif ($isEntregue): ?>
-                                <button class="item-btn undo" onclick="desfazerUm(<?php echo $row['id']; ?>)"
-                                    title="Desfazer">↩</button>
-                            <?php endif; ?>
-                        </div>
+                        <?php endif; ?>
                     </div>
-                <?php endforeach; ?>
-            </div>
+                    <div class="fornecedor-grid">
+                        <?php foreach ($cliente['fornecedores'] as $forn): ?>
+                            <?php
+                            $isPendente = ($forn['situacao_id'] == 1);
+                            $isEntregue = ($forn['situacao_id'] == 6);
+                            ?>
+                            <div class="fornecedor-item <?php echo $isPendente ? 'pendente' : ($isEntregue ? 'entregue' : ''); ?>"
+                                data-id="<?php echo $forn['id']; ?>" data-status="<?php echo $forn['situacao_id']; ?>">
+                                <div class="fornecedor-nome" title="<?php echo htmlspecialchars($forn['nome']); ?>">
+                                    <?php echo htmlspecialchars($forn['nome']); ?>
+                                </div>
+                                <div class="fornecedor-qde">Qtd: <strong><?php echo $forn['qde']; ?></strong></div>
+                                <div class="fornecedor-action">
+                                    <label class="switch">
+                                        <input type="checkbox" onchange="toggleStatus(this, <?php echo $forn['id']; ?>)" <?php echo $isEntregue ? 'checked' : ''; ?>>
+                                        <span class="slider round"></span>
+                                    </label>
+                                    <span class="status-label <?php echo $isEntregue ? 'entregue' : 'pendente'; ?>">
+                                        <?php echo $isEntregue ? 'Entregue' : 'Não Entregue'; ?>
+                                    </span>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endforeach; ?>
 
         <?php elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])): ?>
             <div class="empty">
@@ -803,16 +959,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
                 <p>Nenhum registro encontrado</p>
             </div>
         <?php else: ?>
-            <div class="card">
+            <div class="filter-card">
                 <div class="empty">
                     <div class="icon">📦</div>
-                    <p>Selecione as datas e/ou fornecedor para buscar as entregas</p>
+                    <p>Selecione os filtros para buscar</p>
                 </div>
             </div>
         <?php endif; ?>
     </main>
 
-    <!-- Modal -->
     <div class="modal-overlay" id="modal">
         <div class="modal">
             <h3 id="modalTitle">Confirmar?</h3>
@@ -825,8 +980,95 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
     </div>
 
     <script>
-        let idsAcao = [];
+        let idAcao = null;
         let tipoAcao = 'confirmar';
+
+        // PDF Generation
+        function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            const dataInicio = document.getElementById('data_inicio').value || 'N/D';
+            const dataFim = document.getElementById('data_fim').value || 'N/D';
+            const today = new Date().toLocaleDateString('pt-BR');
+
+            // Header
+            doc.setFontSize(16);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Relatório de Validação de Fornecedores', 105, 15, { align: 'center' });
+
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Período: ${dataInicio} a ${dataFim}`, 105, 22, { align: 'center' });
+            doc.text(`Gerado em: ${today}`, 105, 27, { align: 'center' });
+
+            let y = 40;
+            const pageHeight = 280;
+
+            // Get all client cards
+            const clientCards = document.querySelectorAll('.client-card');
+
+            clientCards.forEach((card, index) => {
+                const clientName = card.querySelector('.client-name')?.textContent || 'N/D';
+                let clientPhone = card.querySelector('.client-phone a')?.textContent?.trim() || '';
+                // Remove emoji from phone
+                clientPhone = clientPhone.replace(/[^\d\s\-\(\)]/g, '').trim();
+
+                // Check if we need a new page
+                if (y > pageHeight - 30) {
+                    doc.addPage();
+                    y = 20;
+                }
+
+                // Client header
+                doc.setFillColor(31, 111, 80);
+                doc.rect(10, y - 5, 190, 10, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(11);
+                doc.text(clientName + (clientPhone ? ` - ${clientPhone}` : ''), 15, y + 2);
+                doc.setTextColor(0, 0, 0);
+
+                y += 12;
+
+                // Fornecedores
+                const fornecedores = card.querySelectorAll('.fornecedor-item');
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'normal');
+
+                fornecedores.forEach(forn => {
+                    if (y > pageHeight) {
+                        doc.addPage();
+                        y = 20;
+                    }
+
+                    const nome = forn.querySelector('.fornecedor-nome')?.textContent?.trim() || 'N/D';
+                    const qde = forn.querySelector('.fornecedor-qde')?.textContent?.trim() || '';
+                    const isEntregue = forn.classList.contains('entregue');
+                    const status = isEntregue ? '[OK]' : '[  ]';
+
+                    doc.setTextColor(isEntregue ? 40 : 150, isEntregue ? 167 : 50, isEntregue ? 69 : 50);
+                    doc.text(status, 15, y);
+                    doc.setTextColor(0, 0, 0);
+                    doc.text(`${nome} - ${qde}`, 28, y);
+
+                    y += 6;
+                });
+
+                y += 8;
+            });
+
+            // Stats footer
+            const stats = document.querySelectorAll('.stat .num');
+            if (stats.length >= 3) {
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'bold');
+                const footerY = doc.internal.pageSize.height - 15;
+                doc.text(`Clientes: ${stats[0].textContent} | Itens: ${stats[1].textContent} | Pendentes: ${stats[2].textContent}`, 105, footerY, { align: 'center' });
+            }
+
+            doc.save(`validacao_fornecedores_${dataInicio}_${dataFim}.pdf`);
+        }
 
         function toggleMenu() {
             document.getElementById('sidebar').classList.toggle('open');
@@ -837,48 +1079,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
             document.getElementById('overlay').classList.remove('active');
         }
 
-        function updateCount() {
-            const checked = document.querySelectorAll('.row-check:checked');
-            document.getElementById('selectedCount').textContent = checked.length + ' selecionado(s)';
-            document.getElementById('btnConfirm').disabled = checked.length === 0;
-            document.querySelectorAll('.list-item').forEach(item => {
-                const cb = item.querySelector('.row-check');
-                item.classList.toggle('selected', cb && cb.checked);
-            });
-        }
-
-        function toggleAll() {
-            const cbs = document.querySelectorAll('.row-check');
-            const allChecked = Array.from(cbs).every(cb => cb.checked);
-            cbs.forEach(cb => cb.checked = !allChecked);
-            updateCount();
-        }
-
-        function openModal(ids, tipo) {
-            idsAcao = ids;
-            tipoAcao = tipo;
-            document.getElementById('modalTitle').textContent = tipo === 'confirmar' ? '✅ Confirmar Entrega' : '↩️ Desfazer Entrega';
-            document.getElementById('modalMsg').textContent = ids.length + ' registro(s) serão ' + (tipo === 'confirmar' ? 'confirmados' : 'revertidos');
-            document.getElementById('modalConfirm').className = 'btn ' + (tipo === 'confirmar' ? 'btn-primary' : 'btn-secondary');
+        function confirmar(id) {
+            idAcao = id;
+            tipoAcao = 'confirmar';
+            document.getElementById('modalTitle').textContent = '✅ Confirmar Recebimento';
+            document.getElementById('modalMsg').textContent = 'Marcar este item como recebido?';
             document.getElementById('modal').classList.add('active');
         }
-        function closeModal() {
-            document.getElementById('modal').classList.remove('active');
-            idsAcao = [];
+
+        function desfazer(id) {
+            idAcao = id;
+            tipoAcao = 'desfazer';
+            document.getElementById('modalTitle').textContent = '↩️ Desfazer';
+            document.getElementById('modalMsg').textContent = 'Reverter para pendente?';
+            document.getElementById('modal').classList.add('active');
         }
 
-        function confirmarUm(id) { openModal([id], 'confirmar'); }
-        function desfazerUm(id) { openModal([id], 'desfazer'); }
-        function confirmarLote() {
-            const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(cb => cb.value);
-            if (ids.length > 0) openModal(ids, 'confirmar');
+        function closeModal() {
+            document.getElementById('modal').classList.remove('active');
+            idAcao = null;
         }
 
         async function executarAcao() {
-            if (idsAcao.length === 0) return;
+            if (!idAcao) return;
             const formData = new FormData();
             formData.append('ajax', tipoAcao === 'confirmar' ? 'atualizar_status' : 'desfazer_entrega');
-            idsAcao.forEach(id => formData.append('ids[]', id));
+            formData.append('ids[]', idAcao);
 
             try {
                 const res = await fetch('validafornecedor.php', { method: 'POST', body: formData });
@@ -886,30 +1112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
                 if (data.success) {
                     document.getElementById('alertSuccess').textContent = (tipoAcao === 'confirmar' ? '✅ ' : '↩️ ') + data.message;
                     document.getElementById('alertSuccess').style.display = 'block';
-
-                    idsAcao.forEach(id => {
-                        const item = document.querySelector(`.list-item[data-id="${id}"]`);
-                        if (item) {
-                            const badge = item.querySelector('.badge');
-                            const actions = item.querySelector('.actions');
-                            const check = item.querySelector('.check');
-
-                            if (tipoAcao === 'confirmar') {
-                                item.dataset.status = '6';
-                                if (badge) { badge.className = 'badge badge-done'; badge.textContent = 'Entregue'; }
-                                if (actions) actions.innerHTML = `<button class="item-btn undo" onclick="desfazerUm(${id})">↩</button>`;
-                                if (check) check.innerHTML = '';
-                            } else {
-                                item.dataset.status = '1';
-                                if (badge) { badge.className = 'badge badge-pending'; badge.textContent = 'Pendente'; }
-                                if (actions) actions.innerHTML = `<button class="item-btn confirm" onclick="confirmarUm(${id})">✓</button>`;
-                                if (check) check.innerHTML = `<input type="checkbox" class="row-check" value="${id}" onchange="updateCount()">`;
-                            }
-                            item.classList.remove('selected');
-                        }
-                    });
-                    updateCount();
-                    setTimeout(() => document.getElementById('alertSuccess').style.display = 'none', 4000);
+                    setTimeout(() => document.getElementById('alertSuccess').style.display = 'none', 3000);
                 } else {
                     alert('Erro: ' + data.error);
                 }
@@ -919,37 +1122,122 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
             closeModal();
         }
 
-        // Fornecedores dinâmicos
-        const dataInicio = document.getElementById('data_inicio');
-        const dataFim = document.getElementById('data_fim');
-        const fornecedorSelect = document.getElementById('fornecedor_id');
-        const loading = document.getElementById('loading');
+        async function toggleStatus(checkbox, id) {
+            const isChecked = checkbox.checked;
+            const action = isChecked ? 'atualizar_status' : 'desfazer_entrega';
+            const formData = new FormData();
+            formData.append('ajax', action);
+            formData.append('ids[]', id);
 
-        async function buscarFornecedores() {
-            if (!dataInicio.value && !dataFim.value) return;
-            loading.classList.add('active');
+            const item = checkbox.closest('.fornecedor-item');
+            const label = item.querySelector('.status-label');
+
             try {
-                const params = new URLSearchParams({ ajax: 'fornecedores', data_inicio: dataInicio.value, data_fim: dataFim.value });
-                const res = await fetch(`validafornecedor.php?${params}`);
+                const res = await fetch('validafornecedor.php', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
-                    const current = fornecedorSelect.value;
-                    fornecedorSelect.innerHTML = '<option value="">Todos os Fornecedores</option>';
-                    data.data.forEach(f => {
-                        const opt = document.createElement('option');
-                        opt.value = f.id;
-                        opt.textContent = f.descricao;
-                        if (f.id == current) opt.selected = true;
-                        fornecedorSelect.appendChild(opt);
-                    });
+                    document.getElementById('alertSuccess').textContent = (isChecked ? '✅ ' : '↩️ ') + data.message;
+                    document.getElementById('alertSuccess').style.display = 'block';
+
+                    if (isChecked) {
+                        item.classList.remove('pendente');
+                        item.classList.add('entregue');
+                        item.dataset.status = '6';
+                        label.textContent = 'Entregue';
+                        label.classList.remove('pendente');
+                        label.classList.add('entregue');
+                    } else {
+                        item.classList.remove('entregue');
+                        item.classList.add('pendente');
+                        item.dataset.status = '1';
+                        label.textContent = 'Não Entregue';
+                        label.classList.remove('entregue');
+                        label.classList.add('pendente');
+                    }
+                    setTimeout(() => document.getElementById('alertSuccess').style.display = 'none', 3000);
+                } else {
+                    checkbox.checked = !isChecked;
+                    alert('Erro: ' + data.error);
                 }
-            } catch (e) { }
-            loading.classList.remove('active');
+            } catch (e) {
+                checkbox.checked = !isChecked;
+                alert('Erro de conexão');
+            }
         }
 
-        dataInicio.addEventListener('change', buscarFornecedores);
-        dataFim.addEventListener('change', buscarFornecedores);
-        if (dataInicio.value || dataFim.value) buscarFornecedores();
+        // Autocomplete functionality
+        const fornecedores = <?php echo json_encode($fornecedores); ?>;
+        const clientes = <?php echo json_encode($clientes); ?>;
+
+        function setupAutocomplete(inputId, listId, hiddenId, items, labelKey) {
+            const input = document.getElementById(inputId);
+            const list = document.getElementById(listId);
+            const hidden = document.getElementById(hiddenId);
+
+            // Set initial value if exists
+            const currentVal = hidden.value;
+            if (currentVal) {
+                const found = items.find(item => item.id == currentVal);
+                if (found) input.value = found[labelKey];
+            }
+
+            input.addEventListener('input', function () {
+                const query = this.value.toLowerCase().trim();
+                hidden.value = ''; // Clear selection when typing
+
+                if (query.length === 0) {
+                    list.classList.remove('active');
+                    return;
+                }
+
+                const filtered = items.filter(item =>
+                    item[labelKey].toLowerCase().includes(query)
+                ).slice(0, 15);
+
+                if (filtered.length === 0) {
+                    list.innerHTML = '<div class="autocomplete-item" style="color:#999;">Nenhum resultado</div>';
+                } else {
+                    list.innerHTML = filtered.map(item => {
+                        const label = item[labelKey];
+                        const highlighted = label.replace(
+                            new RegExp(`(${query})`, 'gi'),
+                            '<span class="highlight">$1</span>'
+                        );
+                        return `<div class="autocomplete-item" data-id="${item.id}" data-label="${label}">${highlighted}</div>`;
+                    }).join('');
+                }
+                list.classList.add('active');
+            });
+
+            input.addEventListener('focus', function () {
+                if (this.value.length > 0) {
+                    this.dispatchEvent(new Event('input'));
+                }
+            });
+
+            list.addEventListener('click', function (e) {
+                const item = e.target.closest('.autocomplete-item');
+                if (item && item.dataset.id) {
+                    hidden.value = item.dataset.id;
+                    input.value = item.dataset.label;
+                    list.classList.remove('active');
+                }
+            });
+
+            input.addEventListener('blur', function () {
+                setTimeout(() => list.classList.remove('active'), 200);
+            });
+
+            // Clear button functionality - if user clears input, clear hidden too
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') {
+                    list.classList.remove('active');
+                }
+            });
+        }
+
+        setupAutocomplete('fornecedor_search', 'fornecedor_list', 'fornecedor_id', fornecedores, 'descricao');
+        setupAutocomplete('cliente_search', 'cliente_list', 'cliente_id', clientes, 'nome');
     </script>
 </body>
 
