@@ -138,6 +138,7 @@ try {
     $trips = $optInit->fetchAvailableTrips();
 } catch (Exception $e) {
 }
+$currentPage = 'gerarrota.php';
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -175,138 +176,12 @@ try {
             color: var(--text-color);
         }
 
-        .mobile-header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 56px;
-            background: var(--primary-color);
-            color: white;
-            display: flex;
-            align-items: center;
-            padding: 0 12px;
-            z-index: 2000;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        }
-
-        .menu-btn {
-            width: 44px;
-            height: 44px;
-            background: none;
-            border: none;
-            color: white;
-            font-size: 1.5rem;
-            cursor: pointer;
-            border-radius: 8px;
-        }
-
-        .menu-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .header-title {
-            flex: 1;
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-left: 8px;
-        }
-
-        .sidebar-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 2100;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s;
-        }
-
-        .sidebar-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 280px;
-            max-width: 85vw;
-            height: 100vh;
-            background: linear-gradient(180deg, var(--primary-color) 0%, var(--primary-dark) 100%);
-            z-index: 2200;
-            transform: translateX(-100%);
-            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-            display: flex;
-            flex-direction: column;
-        }
-
-        .sidebar.open {
-            transform: translateX(0);
-        }
-
-        .sidebar-header {
-            padding: 20px 16px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .sidebar-header h2 {
-            color: white;
-            font-size: 1.2rem;
-            font-weight: 600;
-        }
-
-        .sidebar-header p {
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.8rem;
-            margin-top: 4px;
-        }
-
-        .sidebar-nav {
-            flex: 1;
-            padding: 12px 0;
-        }
-
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 14px 16px;
-            color: white;
-            text-decoration: none;
-            font-size: 1rem;
-            border-left: 3px solid transparent;
-            transition: all 0.2s;
-        }
-
-        .nav-item:hover,
-        .nav-item.active {
-            background: rgba(255, 255, 255, 0.1);
-            border-left-color: white;
-        }
-
-        .nav-item .icon {
-            font-size: 1.3rem;
-            width: 28px;
-            text-align: center;
-        }
-
-        .sidebar-footer {
-            padding: 12px 16px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            color: rgba(255, 255, 255, 0.5);
-            font-size: 0.75rem;
-            text-align: center;
-        }
-
+        /* Remove page-specific mobile header since sidebar provides it */
         .container {
+
             max-width: 1200px;
             margin: 0 auto;
-            padding: 68px 20px 20px 20px;
+            padding: 20px;
         }
 
         .search-card {
@@ -512,30 +387,9 @@ try {
 </head>
 
 <body>
-    <header class="mobile-header">
-        <button class="menu-btn" onclick="toggleMenu()">☰</button>
-        <span class="header-title">🗺️ Gerar Rota</span>
-    </header>
+    <?php include 'includes/sidebar.php'; ?>
 
-    <div class="sidebar-overlay" id="overlay" onclick="closeMenu()"></div>
-    <nav class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <h2>🚚 Victor Transportes</h2>
-            <p>Sistema de Gestão</p>
-        </div>
-        <div class="sidebar-nav">
-            <a href="index.php" class="nav-item"><span class="icon">🏠</span> Início</a>
-            <a href="gerarrota.php" class="nav-item active"><span class="icon">🗺️</span> Gerar Rota</a>
-            <a href="validafornecedor.php" class="nav-item"><span class="icon">📦</span> Validar Fornecedor</a>
-            <?php if (!empty($_SESSION['user_is_admin'])): ?>
-                <a href="sobre.php" class="nav-item"><span class="icon">ℹ️</span> Sobre</a>
-            <?php endif; ?>
-            <a href="logout.php" class="nav-item"><span class="icon">🚪</span> Sair</a>
-        </div>
-        <div class="sidebar-footer">© 2026 Victor Transportes</div>
-    </nav>
-
-    <div class="container">
+    <div class="container page-with-sidebar">
         <div class="search-card">
             <form class="search-form" id="routeForm">
                 <div class="form-group">
@@ -994,14 +848,7 @@ try {
             }
         });
 
-        function toggleMenu() {
-            document.getElementById('sidebar').classList.toggle('open');
-            document.getElementById('overlay').classList.toggle('active');
-        }
-        function closeMenu() {
-            document.getElementById('sidebar').classList.remove('open');
-            document.getElementById('overlay').classList.remove('active');
-        }
+
 
         // Inicializa
         initMap();

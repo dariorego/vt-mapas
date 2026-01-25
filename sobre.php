@@ -35,6 +35,7 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sobre - Victor Transportes</title>
+    <?php $currentPage = 'sobre.php'; ?>
     <style>
         :root {
             --primary: #1F6F50;
@@ -58,116 +59,8 @@ try {
             -webkit-tap-highlight-color: transparent;
         }
 
-        .mobile-header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 56px;
-            background: var(--primary);
-            color: white;
-            display: flex;
-            align-items: center;
-            padding: 0 12px;
-            z-index: 2000;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        }
-
-        /* ... */
-
-        .sidebar-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 2100;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s;
-        }
-
-        .sidebar-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 280px;
-            max-width: 85vw;
-            height: 100vh;
-            background: linear-gradient(180deg, var(--primary) 0%, var(--primary-dark) 100%);
-            z-index: 2200;
-            transform: translateX(-100%);
-            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-            display: flex;
-            flex-direction: column;
-        }
-
-        .sidebar.open {
-            transform: translateX(0);
-        }
-
-        .sidebar-header {
-            padding: 20px 16px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .sidebar-header h2 {
-            color: white;
-            font-size: 1.2rem;
-            font-weight: 600;
-        }
-
-        .sidebar-header p {
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.8rem;
-            margin-top: 4px;
-        }
-
-        .sidebar-nav {
-            flex: 1;
-            padding: 12px 0;
-        }
-
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 14px 16px;
-            color: white;
-            text-decoration: none;
-            font-size: 1rem;
-            border-left: 3px solid transparent;
-            transition: all 0.2s;
-        }
-
-        .nav-item:active,
-        .nav-item.active {
-            background: rgba(255, 255, 255, 0.1);
-            border-left-color: white;
-        }
-
-        .nav-item .icon {
-            font-size: 1.3rem;
-            width: 28px;
-            text-align: center;
-        }
-
-        .sidebar-footer {
-            padding: 12px 16px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            color: rgba(255, 255, 255, 0.5);
-            font-size: 0.75rem;
-            text-align: center;
-        }
-
         .main {
-            padding: 68px 16px 20px 16px;
+            padding: 20px 16px 20px 16px;
             max-width: 600px;
             margin: 0 auto;
         }
@@ -267,28 +160,9 @@ try {
 </head>
 
 <body>
-    <header class="mobile-header">
-        <button class="menu-btn" onclick="toggleMenu()">☰</button>
-        <span class="header-title">ℹ️ Sobre</span>
-    </header>
+    <?php include 'includes/sidebar.php'; ?>
 
-    <div class="sidebar-overlay" id="overlay" onclick="closeMenu()"></div>
-    <nav class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <h2>🚚 Victor Transportes</h2>
-            <p>Sistema de Gestão</p>
-        </div>
-        <div class="sidebar-nav">
-            <a href="index.php" class="nav-item"><span class="icon">🏠</span> Início</a>
-            <a href="gerarrota.php" class="nav-item"><span class="icon">🗺️</span> Gerar Rota</a>
-            <a href="validafornecedor.php" class="nav-item"><span class="icon">📦</span> Validar Fornecedor</a>
-            <a href="sobre.php" class="nav-item active"><span class="icon">ℹ️</span> Sobre</a>
-            <a href="logout.php" class="nav-item"><span class="icon">🚪</span> Sair</a>
-        </div>
-        <div class="sidebar-footer">© 2026 Victor Transportes</div>
-    </nav>
-
-    <main class="main">
+    <main class="main page-with-sidebar">
         <div class="about-card">
             <div class="about-header">
                 <div class="logo">🚚</div>
@@ -363,17 +237,6 @@ try {
             </div>
         </div>
     </main>
-
-    <script>
-        function toggleMenu() {
-            document.getElementById('sidebar').classList.toggle('open');
-            document.getElementById('overlay').classList.toggle('active');
-        }
-        function closeMenu() {
-            document.getElementById('sidebar').classList.remove('open');
-            document.getElementById('overlay').classList.remove('active');
-        }
-    </script>
 </body>
 
 </html>

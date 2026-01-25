@@ -184,6 +184,7 @@ foreach ($resultados as $row) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Validar Fornecedor</title>
+    <?php $currentPage = 'validafornecedor.php'; ?>
     <style>
         :root {
             /* Nova paleta - mais elegante e menos saturada */
@@ -214,204 +215,9 @@ foreach ($resultados as $row) {
             -webkit-tap-highlight-color: transparent;
         }
 
-        /* Mobile Header */
-        .mobile-header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 56px;
-            background: var(--primary);
-            color: white;
-            display: flex;
-            align-items: center;
-            padding: 0 12px;
-            z-index: 2000;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        }
-
-        .menu-btn {
-            width: 44px;
-            height: 44px;
-            background: none;
-            border: none;
-            color: white;
-            font-size: 1.5rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 8px;
-        }
-
-        .header-title {
-            flex: 1;
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-left: 8px;
-        }
-
-        /* Sidebar */
-        .sidebar-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 2100;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s;
-        }
-
-        .sidebar-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        /* Sidebar - Novo Design em Duas Colunas */
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 240px;
-            max-width: 85vw;
-            height: 100vh;
-            background: #ffffff;
-            z-index: 2200;
-            transform: translateX(-100%);
-            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-            display: flex;
-            flex-direction: column;
-            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.15);
-        }
-
-        .sidebar.open {
-            transform: translateX(0);
-        }
-
-        .sidebar-header {
-            display: flex;
-            align-items: center;
-            background: var(--primary);
-        }
-
-        .sidebar-header-icon {
-            width: 60px;
-            min-width: 60px;
-            height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0, 0, 0, 0.1);
-        }
-
-        .sidebar-header-icon span {
-            color: white;
-            font-size: 1.3rem;
-        }
-
-        .sidebar-header-title {
-            flex: 1;
-            padding: 0 16px;
-            color: white;
-            font-size: 1rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .sidebar-nav {
-            flex: 1;
-            overflow-y: auto;
-        }
-
-        .nav-item {
-            display: flex;
-            align-items: center;
-            text-decoration: none;
-            transition: all 0.2s;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .nav-item .icon-col {
-            width: 60px;
-            min-width: 60px;
-            height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f8f9fa;
-            border-right: 1px solid var(--border);
-        }
-
-        .nav-item .icon-col span {
-            font-size: 1.3rem;
-            color: var(--text-muted);
-        }
-
-        .nav-item .label-col {
-            flex: 1;
-            padding: 0 16px;
-            font-size: 0.95rem;
-            color: var(--text);
-            font-weight: 500;
-        }
-
-        .nav-item:hover .icon-col {
-            background: var(--primary-bg);
-        }
-
-        .nav-item:hover .label-col {
-            color: var(--primary);
-        }
-
-        .nav-item.active .icon-col {
-            background: var(--primary);
-        }
-
-        .nav-item.active .icon-col span {
-            color: white;
-        }
-
-        .nav-item.active .label-col {
-            background: var(--primary);
-            color: white;
-        }
-
-        .sidebar-footer {
-            display: flex;
-            align-items: center;
-            border-top: 1px solid var(--border);
-        }
-
-        .sidebar-footer .icon-col {
-            width: 60px;
-            min-width: 60px;
-            height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f8f9fa;
-            border-right: 1px solid var(--border);
-        }
-
-        .sidebar-footer .icon-col span {
-            font-size: 1.3rem;
-            color: var(--text-muted);
-        }
-
-        .sidebar-footer .label-col {
-            flex: 1;
-            padding: 8px 16px;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
-
         /* Main */
         .main {
-            padding: 68px 12px 20px 12px;
+            padding: 20px 12px 20px 12px;
         }
 
         /* Filter Card */
@@ -812,30 +618,9 @@ foreach ($resultados as $row) {
 </head>
 
 <body>
-    <header class="mobile-header">
-        <button class="menu-btn" onclick="toggleMenu()">☰</button>
-        <span class="header-title">📦 Validar Fornecedor</span>
-    </header>
+    <?php include 'includes/sidebar.php'; ?>
 
-    <div class="sidebar-overlay" id="overlay" onclick="closeMenu()"></div>
-    <nav class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <h2>🚚 Victor Transportes</h2>
-            <p>Sistema de Gestão</p>
-        </div>
-        <div class="sidebar-nav">
-            <a href="index.php" class="nav-item"><span class="icon">🏠</span> Início</a>
-            <a href="gerarrota.php" class="nav-item"><span class="icon">🗺️</span> Gerar Rota</a>
-            <a href="validafornecedor.php" class="nav-item active"><span class="icon">📦</span> Validar Fornecedor</a>
-            <?php if (!empty($_SESSION['user_is_admin'])): ?>
-                <a href="sobre.php" class="nav-item"><span class="icon">ℹ️</span> Sobre</a>
-            <?php endif; ?>
-            <a href="logout.php" class="nav-item"><span class="icon">🚪</span> Sair</a>
-        </div>
-        <div class="sidebar-footer">© 2026 Victor Transportes</div>
-    </nav>
-
-    <main class="main">
+    <main class="main page-with-sidebar">
         <div class="filter-card">
             <form method="POST" action="">
                 <div class="filter-row">
