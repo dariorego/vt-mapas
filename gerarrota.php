@@ -43,10 +43,22 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'pontos') {
             });
         }
 
+
+        // Extrai ponto do motorista
+        $driverPoint = null;
+        if ($firstPoint && !empty($firstPoint['motorista_lat'])) {
+            $driverPoint = [
+                'latitude' => $firstPoint['motorista_lat'],
+                'longitude' => $firstPoint['motorista_lon'],
+                'nome' => 'Base: ' . ($motorista ?? 'Motorista')
+            ];
+        }
+
         echo json_encode([
             'success' => true,
             'startPoint' => $startPoint,
             'points' => $points,
+            'driverPoint' => $driverPoint,
             'motorista' => $motorista,
             'data' => $dataRemessa,
             'total' => count($points),
@@ -71,10 +83,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['optimize'])) {
 
         $firstPoint = reset($route);
 
+        $driverPoint = null;
+        if ($firstPoint && !empty($firstPoint['motorista_lat'])) {
+            $driverPoint = [
+                'latitude' => $firstPoint['motorista_lat'],
+                'longitude' => $firstPoint['motorista_lon'],
+                'nome' => 'Base: ' . ($firstPoint['motorista_nome'] ?? 'Motorista')
+            ];
+        }
+
         echo json_encode([
             'success' => true,
             'startPoint' => $startPoint,
             'route' => $route,
+            'driverPoint' => $driverPoint,
             'motorista' => $firstPoint['motorista_nome'] ?? 'Não definido',
             'totalDistance' => $optimizer->getTotalDistance(),
             'estimatedTime' => $optimizer->getEstimatedTime()
@@ -178,10 +200,11 @@ $currentPage = 'gerarrota.php';
 
         /* Remove page-specific mobile header since sidebar provides it */
         .container {
-
-            max-width: 1200px;
-            margin: 0 auto;
+            width: 100%;
+            max-width: 100%;
+            margin: 0;
             padding: 20px;
+            min-height: 100vh;
         }
 
         .search-card {
@@ -271,7 +294,8 @@ $currentPage = 'gerarrota.php';
         }
 
         #map {
-            height: 400px;
+            height: calc(100vh - 200px);
+            min-height: 400px;
             width: 100%;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -403,8 +427,20 @@ $currentPage = 'gerarrota.php';
                         <?php endforeach; ?>
                     </select>
                 </div>
+                <div class="line-toggle-container" style="display: flex; flex-direction: row; flex-wrap: wrap; gap: 20px; flex-basis: 100%; margin-top: 10px;">
+                    <label style="display: inline-flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="toggleStartLine" style="width: auto; margin-right: 8px;">
+                        Ocultar linha da base (Ponto de Partida)
+                    </label>
+                    <label style="display: inline-flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="toggleEndLine" style="width: auto; margin-right: 8px;">
+                        Ocultar retorno (Motorista)
+                    </label>
+                </div>
+                <div style="flex-basis: 100%; height: 10px;"></div>
                 <button type="button" id="btnCarregarRota" disabled>🗺️ Gerar Rota</button>
                 <button type="button" id="btnValidarRota" class="btn-secondary" disabled>✅ Validar Rota</button>
+                <button type="button" id="btnFitBounds" class="btn-secondary" style="background-color: #17a2b8;" disabled>🎯 Enquadrar</button>
             </form>
         </div>
 
@@ -437,12 +473,15 @@ $currentPage = 'gerarrota.php';
     <script>
         // Estado global
         let map;
-        let markers = [];
+        let markers = []; // Marcadores de clientes + start
+        let driverMarker = null; // Marcador específico do motorista
         let polyline = null;
         let startPoint = null;
+        let driverPoint = null;
         let currentPoints = [];
         let isRouteOptimized = false;
         let currentViagemId = null;
+        let currentRouteLatLngs = []; // Armazena a rota de entregas (Start + Clientes)
 
         // Inicializa mapa
         function initMap() {
@@ -457,11 +496,100 @@ $currentPage = 'gerarrota.php';
         function clearMap() {
             markers.forEach(m => map.removeLayer(m));
             markers = [];
+            if (driverMarker) {
+                map.removeLayer(driverMarker);
+                driverMarker = null;
+            }
             if (polyline) {
                 map.removeLayer(polyline);
                 polyline = null;
             }
+            currentRouteLatLngs = [];
+            document.getElementById('btnFitBounds').disabled = true;
         }
+
+        // Função para enquadrar todos os elementos
+        function fitBounds() {
+            const group = new L.FeatureGroup();
+            
+            // Adiciona marcadores ao grupo
+            markers.forEach(marker => group.addLayer(marker));
+            
+            // Adiciona marcador do motorista se existir
+            if (driverMarker) {
+                group.addLayer(driverMarker);
+            }
+            
+            // Adiciona linha se existir e estiver visível (tem pontos)
+            if (polyline && polyline.getLatLngs().length > 0) {
+                group.addLayer(polyline);
+            }
+            
+            // Se o grupo tiver layers, enquadra
+            if (group.getLayers().length > 0) {
+                map.fitBounds(group.getBounds(), { padding: [50, 50] });
+            }
+        }
+
+        // Listener do botão Enquadrar
+        document.getElementById('btnFitBounds').addEventListener('click', fitBounds);
+
+        // Atualiza a visualização do marcador do motorista e da linha
+        function updateMapVisuals() {
+            updateDriverMarker();
+            updatePolyline();
+        }
+
+        function updateDriverMarker() {
+            if (driverMarker) {
+                map.removeLayer(driverMarker);
+                driverMarker = null;
+            }
+
+            if (!driverPoint) return;
+
+            const hideEnd = document.getElementById('toggleEndLine').checked;
+            
+            // Se NÃO estiver oculto, mostra o marcador
+            if (!hideEnd) {
+                driverMarker = L.marker([driverPoint.latitude, driverPoint.longitude], { icon: endIcon })
+                    .addTo(map)
+                    .bindPopup(`<b>${driverPoint.nome}</b><br>🏁 Base / Retorno`);
+            }
+        }
+
+        // Atualiza a linha do mapa baseado nos checkboxes
+        function updatePolyline() {
+            if (!currentRouteLatLngs || currentRouteLatLngs.length === 0) return;
+
+            if (polyline) {
+                map.removeLayer(polyline);
+            }
+
+            const hideStartLine = document.getElementById('toggleStartLine').checked;
+            const hideEndLine = document.getElementById('toggleEndLine').checked;
+            
+            // Copia os pontos da rota de entregas
+            let pointsToDraw = [...currentRouteLatLngs];
+
+            // Se deve ocultar a linha de partida e temos pelo menos 2 pontos
+            if (hideStartLine && pointsToDraw.length > 1) {
+                pointsToDraw.shift(); 
+            }
+
+            // Se deve mostrar o retorno e temos driverPoint, adiciona ao final
+            if (!hideEndLine && driverPoint) {
+                pointsToDraw.push([driverPoint.latitude, driverPoint.longitude]);
+            }
+
+            if (pointsToDraw.length > 0) {
+                polyline = L.polyline(pointsToDraw, { color: '#1F6F50', weight: 4, opacity: 0.8 }).addTo(map);
+            }
+        }
+
+        // Listeners para os checkboxes
+        document.getElementById('toggleStartLine').addEventListener('change', updatePolyline);
+        document.getElementById('toggleEndLine').addEventListener('change', updateMapVisuals);
 
         // Ícones
         const startIcon = L.divIcon({
@@ -488,6 +616,7 @@ $currentPage = 'gerarrota.php';
         function showPointsOnMap(data) {
             clearMap();
             startPoint = data.startPoint;
+            driverPoint = data.driverPoint; // Pode ser null
             currentPoints = data.points;
             isRouteOptimized = false;
 
@@ -506,7 +635,7 @@ $currentPage = 'gerarrota.php';
 
                 const pointIcon = L.divIcon({
                     className: 'point-marker',
-                    html: `<div style='background-color:#dc3545; border-radius:50%; width:14px; height:14px; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3);'></div>`,
+                    html: `<div style='background-color:#dc3545; border-radius:50%; width:14px; height:14px; border:2px solid white; box-shadow:0 2px 4px rgba{0,0,0,0.3);'></div>`,
                     iconSize: [14, 14], iconAnchor: [7, 7]
                 });
 
@@ -517,6 +646,15 @@ $currentPage = 'gerarrota.php';
                 bounds.push([lat, lon]);
             });
 
+            // Se tiver driver point, adiciona aos bounds mas não mostra marcador ainda (pois não é rota)
+            // Ou podemos mostrar? "ajax=pontos" é pré-rota. Vamos mostrar se existir.
+            if (driverPoint) {
+                 // Apenas para bounds
+                 bounds.push([driverPoint.latitude, driverPoint.longitude]);
+                 // updateDriverMarker(); // Opcional: mostrar flag do motorista mesmo sem rota? Vamos mostrar.
+            }
+            updateDriverMarker();
+
             map.fitBounds(bounds, { padding: [50, 50] });
 
             // Atualiza info
@@ -525,12 +663,14 @@ $currentPage = 'gerarrota.php';
                 `Viagem #${currentViagemId} | Data: ${data.data ? new Date(data.data).toLocaleDateString('pt-BR') : 'N/D'} | ${data.total} pontos de entrega`;
             document.getElementById('infoPanel').classList.add('visible');
             document.getElementById('tableContainer').classList.remove('visible');
+            document.getElementById('btnFitBounds').disabled = false;
         }
 
         // Mostra rota já existente no banco (ordem já definida)
         function showExistingRoute(data) {
             clearMap();
             startPoint = data.startPoint;
+            driverPoint = data.driverPoint;
             currentPoints = data.points;
             isRouteOptimized = true;
 
@@ -540,30 +680,37 @@ $currentPage = 'gerarrota.php';
                 .bindPopup(`<b>${startPoint.nome}</b><br>🚩 Ponto de Partida`);
             markers.push(startMarker);
 
-            const latlngs = [[startPoint.latitude, startPoint.longitude]];
+            // Inicia array de coordenadas da rota
+            currentRouteLatLngs = [[startPoint.latitude, startPoint.longitude]];
 
             // Marcadores numerados conforme ordem do banco
             currentPoints.forEach((point, index) => {
                 const lat = parseFloat(point.latitude);
                 const lon = parseFloat(point.longitude);
-                const isLast = index === currentPoints.length - 1;
                 const ordem = point.ordem || (index + 1);
-
-                const icon = isLast ? endIcon : createNumberIcon(ordem);
+                
+                // Todos recebem número, mesmo o último da rota de clientes
+                const icon = createNumberIcon(ordem);
                 let popup = `<b>${ordem}. ${point.cliente_nome || 'Cliente'}</b><br>`;
-                if (isLast) popup += `🏁 <b>Última Entrega</b><br>`;
                 popup += `${point.situacao_descricao || ''}`;
 
                 const marker = L.marker([lat, lon], { icon })
                     .addTo(map)
                     .bindPopup(popup);
                 markers.push(marker);
-                latlngs.push([lat, lon]);
+                currentRouteLatLngs.push([lat, lon]);
             });
 
-            // Linha da rota
-            polyline = L.polyline(latlngs, { color: '#1F6F50', weight: 4, opacity: 0.8 }).addTo(map);
-            map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+            // Atualiza linha e marcador do motorista
+            updateMapVisuals();
+            
+            // Ajusta o zoom
+            if (currentRouteLatLngs.length > 0) {
+                 const tempPoly = L.polyline(currentRouteLatLngs);
+                 const bounds = tempPoly.getBounds();
+                 if (driverPoint) bounds.extend([driverPoint.latitude, driverPoint.longitude]);
+                 map.fitBounds(bounds, { padding: [50, 50] });
+            }
 
             // Atualiza info
             document.getElementById('infoMotorista').textContent = `Motorista: ${data.motorista.toUpperCase()}`;
@@ -603,12 +750,14 @@ $currentPage = 'gerarrota.php';
             // Mantém botão de carregar rota habilitado para re-otimizar se quiser
             document.getElementById('btnCarregarRota').disabled = false;
             document.getElementById('btnValidarRota').disabled = false;
+            document.getElementById('btnFitBounds').disabled = false;
         }
 
         // Mostra rota otimizada
         function showOptimizedRoute(data) {
             clearMap();
             startPoint = data.startPoint;
+            driverPoint = data.driverPoint;
             currentPoints = data.route;
             isRouteOptimized = true;
 
@@ -618,29 +767,34 @@ $currentPage = 'gerarrota.php';
                 .bindPopup(`<b>${startPoint.nome}</b><br>🚩 Ponto de Partida`);
             markers.push(startMarker);
 
-            const latlngs = [[startPoint.latitude, startPoint.longitude]];
+            // Inicia array de coordenadas da rota
+            currentRouteLatLngs = [[startPoint.latitude, startPoint.longitude]];
 
             // Marcadores numerados
             currentPoints.forEach((point, index) => {
                 const lat = parseFloat(point.latitude);
                 const lon = parseFloat(point.longitude);
-                const isLast = index === currentPoints.length - 1;
 
-                const icon = isLast ? endIcon : createNumberIcon(point.ordem);
+                const icon = createNumberIcon(point.ordem);
                 let popup = `<b>${point.ordem}. ${point.cliente_nome || 'Cliente'}</b><br>`;
-                if (isLast) popup += `🏁 <b>Última Entrega</b><br>`;
                 popup += `${point.situacao_descricao || ''}<br>Distância: ${point.distancia} km`;
 
                 const marker = L.marker([lat, lon], { icon })
                     .addTo(map)
                     .bindPopup(popup);
                 markers.push(marker);
-                latlngs.push([lat, lon]);
+                currentRouteLatLngs.push([lat, lon]);
             });
 
-            // Linha da rota
-            polyline = L.polyline(latlngs, { color: '#1F6F50', weight: 4, opacity: 0.8 }).addTo(map);
-            map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+            // Linha e Marker
+            updateMapVisuals();
+            
+            if (currentRouteLatLngs.length > 0) {
+                 const tempPoly = L.polyline(currentRouteLatLngs);
+                 const bounds = tempPoly.getBounds();
+                 if (driverPoint) bounds.extend([driverPoint.latitude, driverPoint.longitude]);
+                 map.fitBounds(bounds, { padding: [50, 50] });
+            }
 
             // Atualiza info
             document.getElementById('infoMotorista').textContent = `Motorista: ${data.motorista.toUpperCase()}`;
@@ -670,18 +824,21 @@ $currentPage = 'gerarrota.php';
             document.getElementById('tableContainer').classList.add('visible');
 
             // Habilita drag-and-drop
+            // Habilita drag-and-drop
             new Sortable(tbody, {
                 animation: 150,
                 ghostClass: 'sortable-ghost',
                 onEnd: recalculateRoute
             });
+            document.getElementById('btnFitBounds').disabled = false;
         }
 
         // Recalcula após drag-and-drop e salva no banco
         async function recalculateRoute() {
             const tbody = document.getElementById('tableBody');
             const rows = tbody.querySelectorAll('tr');
-            const newLatLngs = [[startPoint.latitude, startPoint.longitude]];
+            
+            currentRouteLatLngs = [[parseFloat(startPoint.latitude), parseFloat(startPoint.longitude)]];
 
             let currentLat = parseFloat(startPoint.latitude);
             let currentLon = parseFloat(startPoint.longitude);
@@ -701,26 +858,26 @@ $currentPage = 'gerarrota.php';
                 const lon = parseFloat(row.dataset.lon);
                 const seqNum = index + 1;
                 const dist = calculateDistance(currentLat, currentLon, lat, lon);
-                const isLast = index === rows.length - 1;
+                // const isLast = index === rows.length - 1; // This is no longer needed for marker icon selection
 
                 row.querySelector('.seq-num strong').textContent = seqNum;
                 row.querySelector('.dist-cell').textContent = dist.toFixed(2) + ' km';
                 row.querySelector('.time-cell').textContent = Math.round((dist / 40) * 60) + ' min';
 
-                const icon = isLast ? endIcon : createNumberIcon(seqNum);
+                const icon = createNumberIcon(seqNum);
                 const marker = L.marker([lat, lon], { icon }).addTo(map)
                     .bindPopup(`<b>${seqNum}. ${row.dataset.client}</b>`);
                 markers.push(marker);
 
                 currentLat = lat;
                 currentLon = lon;
-                newLatLngs.push([lat, lon]);
+                currentRouteLatLngs.push([lat, lon]);
 
                 // Adiciona à lista de ordens para salvar
                 orders.push({ id: row.dataset.id, ordem: seqNum });
             });
 
-            polyline = L.polyline(newLatLngs, { color: '#1F6F50', weight: 4, opacity: 0.8 }).addTo(map);
+            updateMapVisuals();
 
             // Salva a nova ordem no banco
             try {

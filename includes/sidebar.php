@@ -7,6 +7,19 @@
  * Requer: Variável $currentPage deve estar definida antes do include
  */
 
+// Se está dentro do sistema de abas, não renderiza o sidebar
+if (isset($_GET['notabs']) && $_GET['notabs'] === '1') {
+    // Apenas adiciona estilo para página sem sidebar
+    echo '<style>
+        .page-with-sidebar { 
+            margin-left: 0 !important; 
+            width: 100% !important;
+            padding-top: 0 !important;
+        }
+    </style>';
+    return;
+}
+
 // Detecta a página atual se não foi definida
 if (!isset($currentPage)) {
     $currentPage = basename($_SERVER['PHP_SELF']);
@@ -176,6 +189,7 @@ $isCadastrosPage = in_array($currentPage, ['motorista.php']);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
         z-index: 2201;
         transition: transform var(--sidebar-transition), background var(--sidebar-transition);
+        padding: 0;
     }
 
     .sidebar-toggle:hover {
@@ -183,14 +197,16 @@ $isCadastrosPage = in_array($currentPage, ['motorista.php']);
     }
 
     .sidebar-toggle:hover .toggle-icon {
-        color: #fff;
+        stroke: #fff;
     }
 
     .toggle-icon {
-        width: 16px;
-        height: 16px;
-        color: var(--sidebar-bg-start);
-        transition: transform var(--sidebar-transition), color var(--sidebar-transition);
+        width: 14px;
+        height: 14px;
+        stroke: var(--sidebar-bg-start);
+        stroke-width: 2.5;
+        fill: none;
+        transition: transform var(--sidebar-transition), stroke var(--sidebar-transition);
     }
 
     .sidebar.collapsed .toggle-icon {
@@ -480,10 +496,13 @@ $isCadastrosPage = in_array($currentPage, ['motorista.php']);
         margin-left: var(--sidebar-width);
         transition: margin-left var(--sidebar-transition);
         padding-top: 0;
+        min-height: 100vh;
+        width: calc(100vw - var(--sidebar-width));
     }
 
     body.sidebar-collapsed .page-with-sidebar {
         margin-left: var(--sidebar-collapsed-width);
+        width: calc(100vw - var(--sidebar-collapsed-width));
     }
 
     /* Desktop - hide mobile header, show sidebar */
@@ -523,6 +542,8 @@ $isCadastrosPage = in_array($currentPage, ['motorista.php']);
         .page-with-sidebar {
             margin-left: 0 !important;
             padding-top: 68px;
+            width: 100% !important;
+            min-height: calc(100vh - 68px);
         }
     }
 </style>

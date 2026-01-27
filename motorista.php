@@ -194,8 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         /* Main Container */
         .main-content {
             padding: 20px;
-            max-width: 1400px;
-            margin: 0 auto;
+            width: 100%;
         }
 
         /* Page Header */
