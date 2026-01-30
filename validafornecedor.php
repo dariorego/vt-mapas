@@ -22,6 +22,7 @@ $filtroDataInicio = $_POST['data_inicio'] ?? $_GET['data_inicio'] ?? '';
 $filtroDataFim = $_POST['data_fim'] ?? $_GET['data_fim'] ?? '';
 $filtroFornecedor = $_POST['fornecedor_id'] ?? '';
 $filtroCliente = $_POST['cliente_id'] ?? '';
+$filtroStatus = $_POST['status_entrega'] ?? '';
 
 // AJAX: Atualiza status (1 -> 6)
 if (isset($_POST['ajax']) && $_POST['ajax'] === 'atualizar_status') {
@@ -89,7 +90,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'clientes') {
     header('Content-Type: application/json');
     try {
         $params = [];
-        $sql = "SELECT DISTINCT c.id, c.nome FROM prod_vt.remessa_valor rv
+        $sql = "SELECT DISTINCT c.id, c.nome, c.fone, 
+                CONCAT(c.nome, COALESCE(CONCAT(' - ', c.fone), '')) as nome_telefone
+                FROM prod_vt.remessa_valor rv
                 LEFT JOIN prod_vt.cliente c ON c.id = rv.cliente_id 
                 LEFT JOIN prod_vt.viagem v ON v.id = rv.remessa_viagem_id WHERE c.id IS NOT NULL";
         if (!empty($_GET['data_inicio'])) {
@@ -112,7 +115,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'clientes') {
 // Carrega listas iniciais
 try {
     $fornecedores = $db->query("SELECT id, descricao FROM prod_vt.fornecedor ORDER BY descricao");
-    $clientes = $db->query("SELECT id, nome FROM prod_vt.cliente ORDER BY nome LIMIT 500");
+    $clientes = $db->query("SELECT id, nome, fone, CONCAT(nome, COALESCE(CONCAT(' - ', fone), '')) as nome_telefone FROM prod_vt.cliente ORDER BY nome LIMIT 1000");
 } catch (Exception $e) {
 }
 
@@ -145,6 +148,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
         if (!empty($filtroCliente)) {
             $whereConditions[] = "rv.cliente_id = :cliente_id";
             $params[':cliente_id'] = $filtroCliente;
+        }
+        if (!empty($filtroStatus)) {
+            if ($filtroStatus === 'entregue') {
+                $whereConditions[] = "rv.remessa_situacao_id = 6";
+            } elseif ($filtroStatus === 'nao_entregue') {
+                $whereConditions[] = "rv.remessa_situacao_id = 1";
+            }
         }
         if (!empty($whereConditions)) {
             $sql .= " WHERE " . implode(" AND ", $whereConditions);
@@ -613,6 +623,94 @@ foreach ($resultados as $row) {
                 grid-template-columns: repeat(4, 1fr);
             }
         }
+
+        /* Status Filter Toggle Buttons */
+        .status-toggle-group {
+            display: flex;
+            gap: 0;
+            background: #f1f3f5;
+            border-radius: 10px;
+            padding: 4px;
+            width: 100%;
+        }
+
+        .status-toggle {
+            flex: 1;
+            position: relative;
+        }
+
+        .status-toggle input {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .status-toggle-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            background: transparent;
+            border: none;
+            width: 100%;
+            text-align: center;
+        }
+
+        .status-toggle-btn .icon {
+            font-size: 1rem;
+            line-height: 1;
+        }
+
+        .status-toggle input:checked + .status-toggle-btn {
+            background: white;
+            color: var(--text);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            font-weight: 600;
+        }
+
+        .status-toggle.todos input:checked + .status-toggle-btn {
+            background: var(--primary);
+            color: white;
+        }
+
+        .status-toggle.entregue input:checked + .status-toggle-btn {
+            background: var(--success);
+            color: white;
+        }
+
+        .status-toggle.nao-entregue input:checked + .status-toggle-btn {
+            background: var(--warning);
+            color: white;
+        }
+
+        .status-toggle-btn:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .status-toggle input:checked + .status-toggle-btn:hover {
+            filter: brightness(1.05);
+        }
+
+        @media (max-width: 400px) {
+            .status-toggle-btn {
+                padding: 8px 6px;
+                font-size: 0.75rem;
+            }
+            .status-toggle-btn .icon {
+                font-size: 0.9rem;
+            }
+            .status-toggle-btn .text {
+                display: none;
+            }
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
@@ -622,7 +720,7 @@ foreach ($resultados as $row) {
 
     <main class="main page-with-sidebar">
         <div class="filter-card">
-            <form method="POST" action="">
+            <form method="POST" action="" id="filterForm">
                 <div class="filter-row">
                     <div class="filter-group">
                         <label>Data Início *</label>
@@ -657,6 +755,34 @@ foreach ($resultados as $row) {
                             <div class="autocomplete-list" id="cliente_list"></div>
                         </div>
                         <div class="loading" id="loadingC">🔄</div>
+                    </div>
+                </div>
+                <div class="filter-row">
+                    <div class="filter-group" style="flex: none; width: 100%;">
+                        <label>Status de Entrega</label>
+                        <div class="status-toggle-group">
+                            <label class="status-toggle todos">
+                                <input type="radio" name="status_entrega" value="" <?php echo empty($filtroStatus) ? 'checked' : ''; ?>>
+                                <span class="status-toggle-btn">
+                                    <span class="icon">📋</span>
+                                    <span class="text">Todos</span>
+                                </span>
+                            </label>
+                            <label class="status-toggle entregue">
+                                <input type="radio" name="status_entrega" value="entregue" <?php echo $filtroStatus === 'entregue' ? 'checked' : ''; ?>>
+                                <span class="status-toggle-btn">
+                                    <span class="icon">✅</span>
+                                    <span class="text">Entregue</span>
+                                </span>
+                            </label>
+                            <label class="status-toggle nao-entregue">
+                                <input type="radio" name="status_entrega" value="nao_entregue" <?php echo $filtroStatus === 'nao_entregue' ? 'checked' : ''; ?>>
+                                <span class="status-toggle-btn">
+                                    <span class="icon">⏳</span>
+                                    <span class="text">Não Entregue</span>
+                                </span>
+                            </label>
+                        </div>
                     </div>
                 </div>
                 <div class="btn-row">
@@ -977,7 +1103,7 @@ foreach ($resultados as $row) {
 
                 const filtered = items.filter(item =>
                     item[labelKey].toLowerCase().includes(query)
-                ).slice(0, 15);
+                ).slice(0, 25);
 
                 if (filtered.length === 0) {
                     list.innerHTML = '<div class="autocomplete-item" style="color:#999;">Nenhum resultado</div>';
@@ -1022,7 +1148,30 @@ foreach ($resultados as $row) {
         }
 
         setupAutocomplete('fornecedor_search', 'fornecedor_list', 'fornecedor_id', fornecedores, 'descricao');
-        setupAutocomplete('cliente_search', 'cliente_list', 'cliente_id', clientes, 'nome');
+        setupAutocomplete('cliente_search', 'cliente_list', 'cliente_id', clientes, 'nome_telefone');
+
+        // Auto-submit on status change
+        document.querySelectorAll('input[name="status_entrega"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                // Verifica se as datas estão preenchidas
+                const dataInicio = document.getElementById('data_inicio').value;
+                const dataFim = document.getElementById('data_fim').value;
+                
+                if (dataInicio && dataFim) {
+                    // Adiciona um campo hidden para indicar que é um filtro
+                    const hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = 'filtrar';
+                    hiddenInput.value = '1';
+                    document.getElementById('filterForm').appendChild(hiddenInput);
+                    
+                    // Submete o formulário
+                    document.getElementById('filterForm').submit();
+                } else {
+                    alert('Por favor, preencha as datas de início e fim antes de filtrar.');
+                }
+            });
+        });
     </script>
 </body>
 
