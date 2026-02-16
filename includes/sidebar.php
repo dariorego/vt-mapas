@@ -36,12 +36,23 @@ $pageTitles = [
     'validafornecedor.php' => '📦 Validar Fornecedor',
     'optimize_routes.php' => '🛣️ Otimizar Rotas',
     'motorista.php' => '🚗 Motoristas',
+    'cliente.php' => '👥 Clientes',
+    'viagem.php' => '🚐 Relação de Viagem',
+    'pedido.php' => '📦 Pedidos',
+    'ranking.php' => '🏆 Ranking',
+    'configuracoes.php' => '⚙️ Configurações',
     'sobre.php' => 'ℹ️ Sobre'
 ];
 $pageTitle = $pageTitles[$currentPage] ?? '🚚 Victor Transportes';
 
 // Verifica se está em uma página de cadastros para manter submenu aberto
-$isCadastrosPage = in_array($currentPage, ['motorista.php']);
+$isCadastrosPage = in_array($currentPage, ['motorista.php', 'cliente.php']);
+// Verifica se está em uma página de viagens para manter submenu aberto
+$isViagensPage = in_array($currentPage, ['viagem.php', 'pedido.php', 'gerarrota.php']);
+// Verifica se está em uma página de fornecedor para manter submenu aberto
+$isFornecedorPage = in_array($currentPage, ['validafornecedor.php']);
+// Verifica se está em uma página de relatórios para manter submenu aberto
+$isRelatoriosPage = in_array($currentPage, ['ranking.php']);
 ?>
 <style>
     :root {
@@ -584,19 +595,6 @@ $isCadastrosPage = in_array($currentPage, ['motorista.php']);
             <span class="tooltip">Início</span>
         </a>
 
-        <a href="gerarrota.php" class="nav-link <?php echo $currentPage === 'gerarrota.php' ? 'active' : ''; ?>">
-            <span class="icon">🗺️</span>
-            <span class="label">Gerar Rota</span>
-            <span class="tooltip">Gerar Rota</span>
-        </a>
-
-        <a href="validafornecedor.php"
-            class="nav-link <?php echo $currentPage === 'validafornecedor.php' ? 'active' : ''; ?>">
-            <span class="icon">📦</span>
-            <span class="label">Validar Fornecedor</span>
-            <span class="tooltip">Validar Fornecedor</span>
-        </a>
-
         <!-- Cadastros Submenu -->
         <button class="nav-submenu-toggle <?php echo $isCadastrosPage ? 'open active' : ''; ?>" id="cadastrosToggle">
             <span class="icon">📋</span>
@@ -613,7 +611,82 @@ $isCadastrosPage = in_array($currentPage, ['motorista.php']);
                 <span class="label">Motoristas</span>
                 <span class="tooltip">Motoristas</span>
             </a>
+            <a href="cliente.php" class="nav-link <?php echo $currentPage === 'cliente.php' ? 'active' : ''; ?>">
+                <span class="icon">👥</span>
+                <span class="label">Clientes</span>
+                <span class="tooltip">Clientes</span>
+            </a>
         </div>
+
+        <!-- Viagens Submenu -->
+        <button class="nav-submenu-toggle <?php echo $isViagensPage ? 'open active' : ''; ?>" id="viagensToggle">
+            <span class="icon">🚐</span>
+            <span class="label">Viagens</span>
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+            <span class="tooltip">Viagens</span>
+        </button>
+        <div class="nav-submenu <?php echo $isViagensPage ? 'open' : ''; ?>" id="viagensSubmenu">
+            <a href="viagem.php" class="nav-link <?php echo $currentPage === 'viagem.php' ? 'active' : ''; ?>">
+                <span class="icon">📋</span>
+                <span class="label">Relação de Viagem</span>
+                <span class="tooltip">Relação de Viagem</span>
+            </a>
+            <a href="pedido.php" class="nav-link <?php echo $currentPage === 'pedido.php' ? 'active' : ''; ?>">
+                <span class="icon">📦</span>
+                <span class="label">Pedidos</span>
+                <span class="tooltip">Pedidos</span>
+            </a>
+            <a href="gerarrota.php" class="nav-link <?php echo $currentPage === 'gerarrota.php' ? 'active' : ''; ?>">
+                <span class="icon">🗺️</span>
+                <span class="label">Gerar Rota</span>
+                <span class="tooltip">Gerar Rota</span>
+            </a>
+        </div>
+
+        <!-- Fornecedor Submenu -->
+        <button class="nav-submenu-toggle <?php echo $isFornecedorPage ? 'open active' : ''; ?>" id="fornecedorToggle">
+            <span class="icon">🏭</span>
+            <span class="label">Fornecedor</span>
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+            <span class="tooltip">Fornecedor</span>
+        </button>
+        <div class="nav-submenu <?php echo $isFornecedorPage ? 'open' : ''; ?>" id="fornecedorSubmenu">
+            <a href="validafornecedor.php" class="nav-link <?php echo $currentPage === 'validafornecedor.php' ? 'active' : ''; ?>">
+                <span class="icon">📦</span>
+                <span class="label">Validar Fornecedor</span>
+                <span class="tooltip">Validar Fornecedor</span>
+            </a>
+        </div>
+
+        <!-- Relatórios Submenu -->
+        <button class="nav-submenu-toggle <?php echo $isRelatoriosPage ? 'open active' : ''; ?>" id="relatoriosToggle">
+            <span class="icon">📊</span>
+            <span class="label">Relatórios</span>
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+            <span class="tooltip">Relatórios</span>
+        </button>
+        <div class="nav-submenu <?php echo $isRelatoriosPage ? 'open' : ''; ?>" id="relatoriosSubmenu">
+            <a href="ranking.php" class="nav-link <?php echo $currentPage === 'ranking.php' ? 'active' : ''; ?>">
+                <span class="icon">🏆</span>
+                <span class="label">Ranking</span>
+                <span class="tooltip">Ranking</span>
+            </a>
+        </div>
+
+        <a href="configuracoes.php" class="nav-link <?php echo $currentPage === 'configuracoes.php' ? 'active' : ''; ?>">
+            <span class="icon">⚙️</span>
+            <span class="label">Configurações</span>
+            <span class="tooltip">Configurações</span>
+        </a>
 
         <?php if ($isAdmin): ?>
             <a href="sobre.php" class="nav-link <?php echo $currentPage === 'sobre.php' ? 'active' : ''; ?>">

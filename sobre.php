@@ -234,6 +234,7 @@ try {
             <div class="copyright">
                 <p>© 2026 Victor Transportes</p>
                 <p>Todos os direitos reservados</p>
+                 <p>Versão 29//2026 - 2350</p>
             </div>
         </div>
     </main>

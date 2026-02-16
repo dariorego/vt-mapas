@@ -7,6 +7,91 @@ if (!isset($_SESSION['user_id'])) {
 $userName = $_SESSION['user_name'] ?? 'Usuário';
 $isAdmin = !empty($_SESSION['user_is_admin']);
 $currentPage = 'index.php';
+
+// ===== Cards dinâmicos =====
+$configFile = __DIR__ . '/data/dashboard_cards.json';
+
+// Definição de todos os cards disponíveis
+$allCards = [
+    'gerar_rota' => [
+        'titulo' => 'Gerar Rota', 'descricao' => 'Visualize entregas no mapa e otimize a sequência de visitas para economizar tempo e combustível.',
+        'icone' => '🗺️', 'link' => 'gerarrota.php', 'cor' => '#3B82F6', 'ordem' => 1, 'admin_only' => false
+    ],
+    'validar_fornecedor' => [
+        'titulo' => 'Validar Fornecedor', 'descricao' => 'Controle o recebimento de pacotes, visualize pendências e atualize status em tempo real.',
+        'icone' => '📦', 'link' => 'validafornecedor.php', 'cor' => '#F59E0B', 'ordem' => 2, 'admin_only' => false
+    ],
+    'motoristas' => [
+        'titulo' => 'Motoristas', 'descricao' => 'Cadastro e gestão completa dos motoristas da frota.',
+        'icone' => '🚗', 'link' => 'motorista.php', 'cor' => '#22C55E', 'ordem' => 3, 'admin_only' => false
+    ],
+    'clientes' => [
+        'titulo' => 'Clientes', 'descricao' => 'Gerencie o cadastro de clientes, contatos e localizações.',
+        'icone' => '👥', 'link' => 'cliente.php', 'cor' => '#8B5CF6', 'ordem' => 4, 'admin_only' => false
+    ],
+    'viagens' => [
+        'titulo' => 'Relação de Viagem', 'descricao' => 'Acompanhe viagens, atribua motoristas e controle entregas.',
+        'icone' => '🚐', 'link' => 'viagem.php', 'cor' => '#EC4899', 'ordem' => 5, 'admin_only' => false
+    ],
+    'pedidos' => [
+        'titulo' => 'Pedidos', 'descricao' => 'Visualize e gerencie todos os pedidos e remessas do sistema.',
+        'icone' => '📋', 'link' => 'pedido.php', 'cor' => '#14B8A6', 'ordem' => 6, 'admin_only' => false
+    ],
+    'ranking' => [
+        'titulo' => 'Ranking', 'descricao' => 'Relatório de ranking dos clientes e fornecedores que mais utilizam a plataforma.',
+        'icone' => '🏆', 'link' => 'ranking.php', 'cor' => '#F59E0B', 'ordem' => 7, 'admin_only' => false
+    ],
+    'otimizar_rotas' => [
+        'titulo' => 'Otimizar Rotas', 'descricao' => 'Otimize automaticamente a ordem das entregas para reduzir distância percorrida.',
+        'icone' => '🛣️', 'link' => 'optimize_routes.php', 'cor' => '#6366F1', 'ordem' => 8, 'admin_only' => false
+    ],
+    'sobre' => [
+        'titulo' => 'Sobre o Sistema', 'descricao' => 'Visualize informações técnicas, versão do banco de dados e detalhes do release.',
+        'icone' => 'ℹ️', 'link' => 'sobre.php', 'cor' => '#64748B', 'ordem' => 9, 'admin_only' => true
+    ]
+];
+
+// Carregar config salva
+$savedConfig = [];
+if (file_exists($configFile)) {
+    $json = file_get_contents($configFile);
+    $savedConfig = json_decode($json, true) ?: [];
+}
+
+// Montar lista de cards visíveis
+$visibleCards = [];
+if (!empty($savedConfig)) {
+    // Usar config salva
+    $sorted = $savedConfig;
+    uasort($sorted, function($a, $b) { return ($a['ordem'] ?? 99) - ($b['ordem'] ?? 99); });
+    foreach ($sorted as $key => $cfg) {
+        if (!($cfg['enabled'] ?? false)) continue;
+        if (!isset($allCards[$key])) continue;
+        $card = $allCards[$key];
+        if ($card['admin_only'] && !$isAdmin) continue;
+        $visibleCards[] = [
+            'titulo' => $cfg['titulo'] ?? $card['titulo'],
+            'descricao' => $cfg['descricao'] ?? $card['descricao'],
+            'icone' => $card['icone'],
+            'link' => $card['link'],
+            'cor' => $cfg['cor'] ?? $card['cor']
+        ];
+    }
+} else {
+    // Fallback: cards originais
+    $defaults = ['gerar_rota', 'validar_fornecedor', 'sobre'];
+    foreach ($defaults as $key) {
+        $card = $allCards[$key];
+        if ($card['admin_only'] && !$isAdmin) continue;
+        $visibleCards[] = [
+            'titulo' => $card['titulo'],
+            'descricao' => $card['descricao'],
+            'icone' => $card['icone'],
+            'link' => $card['link'],
+            'cor' => $card['cor']
+        ];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -91,6 +176,7 @@ $currentPage = 'index.php';
             align-items: center;
             text-align: center;
             border: 1px solid #f0f0f0;
+            animation: fadeInUp 0.4s ease forwards;
         }
 
         .action-card:hover {
@@ -124,6 +210,20 @@ $currentPage = 'index.php';
             line-height: 1.5;
         }
 
+        .empty-dashboard {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+        .empty-dashboard .icon { font-size: 3rem; margin-bottom: 16px; }
+        .empty-dashboard a { color: var(--primary); text-decoration: none; font-weight: 600; }
+        .empty-dashboard a:hover { text-decoration: underline; }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         @media (max-width: 768px) {
             .main-content {
                 padding: 16px;
@@ -143,26 +243,20 @@ $currentPage = 'index.php';
         </div>
 
         <div class="dashboard-grid">
-            <a href="gerarrota.php" class="action-card">
-                <div class="card-icon">🗺️</div>
-                <h3 class="card-title">Gerar Rota</h3>
-                <p class="card-desc">Visualize entregas no mapa e otimize a sequência de visitas para economizar tempo e
-                    combustível.</p>
-            </a>
-
-            <a href="validafornecedor.php" class="action-card">
-                <div class="card-icon">📦</div>
-                <h3 class="card-title">Validar Fornecedor</h3>
-                <p class="card-desc">Controle o recebimento de pacotes, visualize pendências e atualize status em tempo
-                    real.</p>
-            </a>
-
-            <?php if ($isAdmin): ?>
-                <a href="sobre.php" class="action-card">
-                    <div class="card-icon">ℹ️</div>
-                    <h3 class="card-title">Sobre o Sistema</h3>
-                    <p class="card-desc">Visualize informações técnicas, versão do banco de dados e detalhes do release.</p>
-                </a>
+            <?php if (empty($visibleCards)): ?>
+                <div class="empty-dashboard" style="grid-column:1/-1;">
+                    <div class="icon">🫥</div>
+                    <p>Nenhum card configurado para exibição.</p>
+                    <p><a href="configuracoes.php">⚙️ Ir para Configurações</a> para escolher os cards.</p>
+                </div>
+            <?php else: ?>
+                <?php foreach ($visibleCards as $i => $card): ?>
+                    <a href="<?php echo htmlspecialchars($card['link']); ?>" class="action-card" style="animation-delay:<?php echo $i * 80; ?>ms">
+                        <div class="card-icon"><?php echo $card['icone']; ?></div>
+                        <h3 class="card-title"><?php echo htmlspecialchars($card['titulo']); ?></h3>
+                        <p class="card-desc"><?php echo htmlspecialchars($card['descricao']); ?></p>
+                    </a>
+                <?php endforeach; ?>
             <?php endif; ?>
         </div>
     </main>

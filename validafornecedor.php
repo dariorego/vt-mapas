@@ -18,8 +18,14 @@ $db = new Database();
 $fornecedores = [];
 $clientes = [];
 $resultados = [];
-$filtroDataInicio = $_POST['data_inicio'] ?? $_GET['data_inicio'] ?? '';
-$filtroDataFim = $_POST['data_fim'] ?? $_GET['data_fim'] ?? '';
+// Calcula segunda-feira e sábado da semana corrente como padrão
+$hoje = new DateTime();
+$diaSemana = (int)$hoje->format('N'); // 1 = Segunda, 7 = Domingo
+$segundaFeira = (clone $hoje)->modify('-' . ($diaSemana - 1) . ' days');
+$sabado = (clone $segundaFeira)->modify('+5 days');
+
+$filtroDataInicio = $_POST['data_inicio'] ?? $_GET['data_inicio'] ?? $segundaFeira->format('Y-m-d');
+$filtroDataFim = $_POST['data_fim'] ?? $_GET['data_fim'] ?? $sabado->format('Y-m-d');
 $filtroFornecedor = $_POST['fornecedor_id'] ?? '';
 $filtroCliente = $_POST['cliente_id'] ?? '';
 $filtroStatus = $_POST['status_entrega'] ?? '';
@@ -282,7 +288,7 @@ foreach ($resultados as $row) {
             border: 1px solid #ddd;
             border-top: none;
             border-radius: 0 0 8px 8px;
-            max-height: 200px;
+            max-height: 300px;
             overflow-y: auto;
             z-index: 100;
             display: none;
@@ -312,6 +318,25 @@ foreach ($resultados as $row) {
         .autocomplete-item .highlight {
             background: #fff3cd;
             font-weight: 600;
+        }
+
+        .autocomplete-more {
+            padding: 8px 12px;
+            text-align: center;
+            color: #666;
+            font-size: 0.75rem;
+            background: #f8f9fa;
+            border-top: 1px solid #eee;
+            font-style: italic;
+        }
+
+        .autocomplete-count {
+            padding: 6px 12px;
+            background: var(--primary-bg);
+            color: var(--primary);
+            font-size: 0.7rem;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
         }
 
         .btn-row {
@@ -903,82 +928,198 @@ foreach ($resultados as $row) {
             const dataFim = document.getElementById('data_fim').value || 'N/D';
             const today = new Date().toLocaleDateString('pt-BR');
 
+            // Configurações
+            const pageWidth = 210;
+            const marginLeft = 12;
+            const marginRight = 12;
+            const contentWidth = pageWidth - marginLeft - marginRight;
+            const pageHeight = 297;
+            const marginBottom = 20;
+            
+            // Colunas da tabela
+            const colStatus = marginLeft;
+            const colFornecedor = marginLeft + 12;
+            const colQtd = pageWidth - marginRight - 15;
+            
             // Header
-            doc.setFontSize(16);
+            doc.setFillColor(31, 111, 80);
+            doc.rect(0, 0, pageWidth, 35, 'F');
+            
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(18);
             doc.setFont('helvetica', 'bold');
-            doc.text('Relatório de Validação de Fornecedores', 105, 15, { align: 'center' });
+            doc.text('Validação de Fornecedores', pageWidth / 2, 15, { align: 'center' });
 
             doc.setFontSize(10);
             doc.setFont('helvetica', 'normal');
-            doc.text(`Período: ${dataInicio} a ${dataFim}`, 105, 22, { align: 'center' });
-            doc.text(`Gerado em: ${today}`, 105, 27, { align: 'center' });
+            doc.text(`Período: ${formatDate(dataInicio)} a ${formatDate(dataFim)}`, pageWidth / 2, 23, { align: 'center' });
+            doc.text(`Gerado em: ${today}`, pageWidth / 2, 30, { align: 'center' });
+            doc.setTextColor(0, 0, 0);
 
-            let y = 40;
-            const pageHeight = 280;
+            let y = 45;
 
             // Get all client cards
             const clientCards = document.querySelectorAll('.client-card');
 
-            clientCards.forEach((card, index) => {
-                const clientName = card.querySelector('.client-name')?.textContent || 'N/D';
+            clientCards.forEach((card, cardIndex) => {
+                const clientName = card.querySelector('.client-name')?.textContent?.trim() || 'N/D';
                 let clientPhone = card.querySelector('.client-phone a')?.textContent?.trim() || '';
-                // Remove emoji from phone
                 clientPhone = clientPhone.replace(/[^\d\s\-\(\)]/g, '').trim();
 
-                // Check if we need a new page
-                if (y > pageHeight - 30) {
+                const fornecedores = card.querySelectorAll('.fornecedor-item');
+                const totalItems = fornecedores.length;
+                
+                // Calcula altura necessária para este cliente (header + itens + espaço)
+                const clientHeight = 12 + (totalItems * 8) + 6;
+                
+                // Verifica se precisa de nova página
+                if (y + clientHeight > pageHeight - marginBottom) {
                     doc.addPage();
                     y = 20;
                 }
 
-                // Client header
+                // ===== HEADER DO CLIENTE =====
                 doc.setFillColor(31, 111, 80);
-                doc.rect(10, y - 5, 190, 10, 'F');
+                doc.rect(marginLeft, y, contentWidth, 10, 'F');
                 doc.setTextColor(255, 255, 255);
                 doc.setFont('helvetica', 'bold');
-                doc.setFontSize(11);
-                doc.text(clientName + (clientPhone ? ` - ${clientPhone}` : ''), 15, y + 2);
+                doc.setFontSize(10);
+                doc.text(clientName + (clientPhone ? `  •  ${clientPhone}` : ''), marginLeft + 4, y + 7);
                 doc.setTextColor(0, 0, 0);
-
+                
                 y += 12;
 
-                // Fornecedores
-                const fornecedores = card.querySelectorAll('.fornecedor-item');
-                doc.setFontSize(9);
-                doc.setFont('helvetica', 'normal');
+                // ===== CABEÇALHO DA TABELA =====
+                doc.setFillColor(245, 247, 250);
+                doc.rect(marginLeft, y, contentWidth, 7, 'F');
+                doc.setDrawColor(200, 200, 200);
+                doc.line(marginLeft, y, marginLeft + contentWidth, y);
+                doc.line(marginLeft, y + 7, marginLeft + contentWidth, y + 7);
+                
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(7);
+                doc.setTextColor(100, 100, 100);
+                doc.text('', colStatus + 2, y + 5);
+                doc.text('FORNECEDOR', colFornecedor, y + 5);
+                doc.text('QTD', colQtd + 10, y + 5, { align: 'right' });
+                doc.setTextColor(0, 0, 0);
+                
+                y += 8;
 
-                fornecedores.forEach(forn => {
-                    if (y > pageHeight) {
+                // ===== LINHAS DOS FORNECEDORES =====
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+
+                fornecedores.forEach((forn, fornIndex) => {
+                    // Nova página se necessário
+                    if (y > pageHeight - marginBottom) {
                         doc.addPage();
                         y = 20;
                     }
 
                     const nome = forn.querySelector('.fornecedor-nome')?.textContent?.trim() || 'N/D';
-                    const qde = forn.querySelector('.fornecedor-qde')?.textContent?.trim() || '';
+                    const qdeText = forn.querySelector('.fornecedor-qde')?.textContent?.trim() || '';
+                    const qde = qdeText.replace(/[^\d]/g, '') || '0';
                     const isEntregue = forn.classList.contains('entregue');
-                    const status = isEntregue ? '[OK]' : '[  ]';
-
-                    doc.setTextColor(isEntregue ? 40 : 150, isEntregue ? 167 : 50, isEntregue ? 69 : 50);
-                    doc.text(status, 15, y);
+                    
+                    // Linha de fundo alternada
+                    if (fornIndex % 2 === 0) {
+                        doc.setFillColor(252, 252, 252);
+                        doc.rect(marginLeft, y - 1, contentWidth, 7, 'F');
+                    }
+                    
+                    // Checkbox de status
+                    doc.setDrawColor(180, 180, 180);
+                    doc.rect(colStatus, y, 4, 4);
+                    if (isEntregue) {
+                        doc.setFillColor(34, 197, 94);
+                        doc.rect(colStatus + 0.5, y + 0.5, 3, 3, 'F');
+                    }
+                    
+                    // Nome do fornecedor
+                    doc.setTextColor(30, 30, 30);
+                    doc.setFont('helvetica', 'normal');
+                    
+                    // Trunca nome se muito longo
+                    let displayNome = nome;
+                    const maxNomeWidth = colQtd - colFornecedor - 10;
+                    while (doc.getTextWidth(displayNome) > maxNomeWidth && displayNome.length > 10) {
+                        displayNome = displayNome.slice(0, -1);
+                    }
+                    if (displayNome !== nome) displayNome += '...';
+                    
+                    doc.text(displayNome, colFornecedor, y + 3);
+                    
+                    // Linha pontilhada
+                    doc.setDrawColor(200, 200, 200);
+                    doc.setLineDashPattern([1, 1], 0);
+                    const nomeWidth = doc.getTextWidth(displayNome);
+                    const lineStart = colFornecedor + nomeWidth + 2;
+                    const lineEnd = colQtd - 2;
+                    if (lineEnd > lineStart) {
+                        doc.line(lineStart, y + 2, lineEnd, y + 2);
+                    }
+                    doc.setLineDashPattern([], 0);
+                    
+                    // Quantidade alinhada à direita
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(31, 111, 80);
+                    doc.text(qde, colQtd + 10, y + 3, { align: 'right' });
                     doc.setTextColor(0, 0, 0);
-                    doc.text(`${nome} - ${qde}`, 28, y);
-
-                    y += 6;
+                    
+                    y += 7;
                 });
-
-                y += 8;
+                
+                // Linha inferior da tabela
+                doc.setDrawColor(200, 200, 200);
+                doc.line(marginLeft, y, marginLeft + contentWidth, y);
+                
+                y += 10;
             });
 
-            // Stats footer
+            // ===== RODAPÉ COM ESTATÍSTICAS =====
             const stats = document.querySelectorAll('.stat .num');
             if (stats.length >= 3) {
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'bold');
-                const footerY = doc.internal.pageSize.height - 15;
-                doc.text(`Clientes: ${stats[0].textContent} | Itens: ${stats[1].textContent} | Pendentes: ${stats[2].textContent}`, 105, footerY, { align: 'center' });
+                // Adiciona rodapé em todas as páginas
+                const totalPages = doc.internal.getNumberOfPages();
+                for (let i = 1; i <= totalPages; i++) {
+                    doc.setPage(i);
+                    const footerY = pageHeight - 10;
+                    
+                    // Linha separadora
+                    doc.setDrawColor(31, 111, 80);
+                    doc.setLineWidth(0.5);
+                    doc.line(marginLeft, footerY - 5, pageWidth - marginRight, footerY - 5);
+                    doc.setLineWidth(0.2);
+                    
+                    // Texto do rodapé
+                    doc.setFontSize(8);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(100, 100, 100);
+                    doc.text(`Página ${i} de ${totalPages}`, marginLeft, footerY);
+                    
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(31, 111, 80);
+                    doc.text(
+                        `Clientes: ${stats[0].textContent}  |  Itens: ${stats[1].textContent}  |  Pendentes: ${stats[2].textContent}`,
+                        pageWidth - marginRight,
+                        footerY,
+                        { align: 'right' }
+                    );
+                }
             }
 
             doc.save(`validacao_fornecedores_${dataInicio}_${dataFim}.pdf`);
+        }
+        
+        // Função auxiliar para formatar data
+        function formatDate(dateStr) {
+            if (!dateStr || dateStr === 'N/D') return dateStr;
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            }
+            return dateStr;
         }
 
         function toggleMenu() {
@@ -1101,14 +1242,26 @@ foreach ($resultados as $row) {
                     return;
                 }
 
-                const filtered = items.filter(item =>
-                    item[labelKey].toLowerCase().includes(query)
-                ).slice(0, 25);
+                const allMatches = items.filter(item => {
+                    const label = (item[labelKey] || '').toString().toLowerCase();
+                    return label.includes(query);
+                });
+                
+                const totalMatches = allMatches.length;
+                const displayLimit = 50;
+                const filtered = allMatches.slice(0, displayLimit);
 
                 if (filtered.length === 0) {
-                    list.innerHTML = '<div class="autocomplete-item" style="color:#999;">Nenhum resultado</div>';
+                    list.innerHTML = '<div class="autocomplete-item" style="color:#999;">Nenhum resultado encontrado</div>';
                 } else {
-                    list.innerHTML = filtered.map(item => {
+                    let html = '';
+                    
+                    // Adiciona contador de resultados
+                    if (totalMatches > 1) {
+                        html += `<div class="autocomplete-count">${totalMatches} ${totalMatches === 1 ? 'resultado' : 'resultados'} encontrado${totalMatches === 1 ? '' : 's'}</div>`;
+                    }
+                    
+                    html += filtered.map(item => {
                         const label = item[labelKey];
                         const highlighted = label.replace(
                             new RegExp(`(${query})`, 'gi'),
@@ -1116,6 +1269,13 @@ foreach ($resultados as $row) {
                         );
                         return `<div class="autocomplete-item" data-id="${item.id}" data-label="${label}">${highlighted}</div>`;
                     }).join('');
+                    
+                    // Indicador de mais resultados
+                    if (totalMatches > displayLimit) {
+                        html += `<div class="autocomplete-more">+ ${totalMatches - displayLimit} resultados não exibidos. Digite mais para refinar.</div>`;
+                    }
+                    
+                    list.innerHTML = html;
                 }
                 list.classList.add('active');
             });

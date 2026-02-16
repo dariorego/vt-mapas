@@ -78,17 +78,30 @@
      * Inicializa os submenus colapsáveis
      */
     function initSubmenus() {
-        const SUBMENU_KEY = 'vt_submenu_cadastros';
-        const toggle = document.getElementById('cadastrosToggle');
-        const submenu = document.getElementById('cadastrosSubmenu');
+        // Cadastros submenu
+        initSubmenu('vt_submenu_cadastros', 'cadastrosToggle', 'cadastrosSubmenu');
+        // Viagens submenu
+        initSubmenu('vt_submenu_viagens', 'viagensToggle', 'viagensSubmenu');
+        // Fornecedor submenu
+        initSubmenu('vt_submenu_fornecedor', 'fornecedorToggle', 'fornecedorSubmenu');
+        // Relatórios submenu
+        initSubmenu('vt_submenu_relatorios', 'relatoriosToggle', 'relatoriosSubmenu');
+    }
+
+    /**
+     * Inicializa um submenu individual
+     */
+    function initSubmenu(storageKey, toggleId, submenuId) {
+        const toggle = document.getElementById(toggleId);
+        const submenu = document.getElementById(submenuId);
 
         if (!toggle || !submenu) return;
 
-        // Aplica estado salvo (se não está em página de cadastros)
-        const savedState = localStorage.getItem(SUBMENU_KEY);
-        const isOnCadastrosPage = toggle.classList.contains('open');
+        // Aplica estado salvo (se não está na página ativa)
+        const savedState = localStorage.getItem(storageKey);
+        const isOnActivePage = toggle.classList.contains('open');
 
-        if (!isOnCadastrosPage && savedState === 'true') {
+        if (!isOnActivePage && savedState === 'true') {
             toggle.classList.add('open');
             submenu.classList.add('open');
         }
@@ -97,7 +110,7 @@
             e.preventDefault();
             const isOpen = toggle.classList.toggle('open');
             submenu.classList.toggle('open', isOpen);
-            localStorage.setItem(SUBMENU_KEY, isOpen.toString());
+            localStorage.setItem(storageKey, isOpen.toString());
         });
     }
 

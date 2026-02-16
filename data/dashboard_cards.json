@@ -1,0 +1,92 @@
+{
+    "gerar_rota": {
+        "enabled": true,
+        "ordem": 1,
+        "titulo": "Gerar Rota",
+        "descricao": "Visualize entregas no mapa e otimize a sequência de visitas para economizar tempo e combustível.",
+        "icone": "🗺️",
+        "link": "gerarrota.php",
+        "cor": "#3B82F6",
+        "admin_only": false
+    },
+    "validar_fornecedor": {
+        "enabled": true,
+        "ordem": 2,
+        "titulo": "Validar Fornecedor",
+        "descricao": "Controle o recebimento de pacotes, visualize pendências e atualize status em tempo real.",
+        "icone": "📦",
+        "link": "validafornecedor.php",
+        "cor": "#F59E0B",
+        "admin_only": false
+    },
+    "motoristas": {
+        "enabled": true,
+        "ordem": 3,
+        "titulo": "Motoristas",
+        "descricao": "Cadastro e gestão completa dos motoristas da frota.",
+        "icone": "🚗",
+        "link": "motorista.php",
+        "cor": "#22C55E",
+        "admin_only": false
+    },
+    "clientes": {
+        "enabled": true,
+        "ordem": 4,
+        "titulo": "Clientes",
+        "descricao": "Gerencie o cadastro de clientes, contatos e localizações.",
+        "icone": "👥",
+        "link": "cliente.php",
+        "cor": "#8B5CF6",
+        "admin_only": false
+    },
+    "viagens": {
+        "enabled": true,
+        "ordem": 5,
+        "titulo": "Relação de Viagem",
+        "descricao": "Acompanhe viagens, atribua motoristas e controle entregas.",
+        "icone": "🚐",
+        "link": "viagem.php",
+        "cor": "#EC4899",
+        "admin_only": false
+    },
+    "pedidos": {
+        "enabled": false,
+        "ordem": 6,
+        "titulo": "Pedidos",
+        "descricao": "Visualize e gerencie todos os pedidos e remessas do sistema.",
+        "icone": "📋",
+        "link": "pedido.php",
+        "cor": "#14B8A6",
+        "admin_only": false
+    },
+    "ranking": {
+        "enabled": false,
+        "ordem": 7,
+        "titulo": "Ranking",
+        "descricao": "Relatório de ranking dos clientes e fornecedores que mais utilizam a plataforma.",
+        "icone": "🏆",
+        "link": "ranking.php",
+        "cor": "#F59E0B",
+        "admin_only": false
+    },
+    "otimizar_rotas": {
+        "enabled": false,
+        "ordem": 8,
+        "titulo": "Otimizar Rotas",
+        "descricao": "Otimize automaticamente a ordem das entregas para reduzir distância percorrida.",
+        "icone": "🛣️",
+        "link": "optimize_routes.php",
+        "cor": "#6366F1",
+        "admin_only": false
+    },
+    "sobre": {
+        "enabled": false,
+        "ordem": 9,
+        "titulo": "Sobre o Sistema",
+        "descricao": "Visualize informações técnicas, versão do banco de dados e detalhes do release.",
+        "icone": "ℹ️",
+        "link": "sobre.php",
+        "cor": "#64748B",
+        "admin_only": true
+    }
+}
