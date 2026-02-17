@@ -37,6 +37,7 @@ $pageTitles = [
     'optimize_routes.php' => '🛣️ Otimizar Rotas',
     'motorista.php' => '🚗 Motoristas',
     'cliente.php' => '👥 Clientes',
+    'fornecedor.php' => '🏭 Fornecedores',
     'viagem.php' => '🚐 Relação de Viagem',
     'pedido.php' => '📦 Pedidos',
     'ranking.php' => '🏆 Ranking',
@@ -46,7 +47,7 @@ $pageTitles = [
 $pageTitle = $pageTitles[$currentPage] ?? '🚚 Victor Transportes';
 
 // Verifica se está em uma página de cadastros para manter submenu aberto
-$isCadastrosPage = in_array($currentPage, ['motorista.php', 'cliente.php']);
+$isCadastrosPage = in_array($currentPage, ['motorista.php', 'cliente.php', 'fornecedor.php']);
 // Verifica se está em uma página de viagens para manter submenu aberto
 $isViagensPage = in_array($currentPage, ['viagem.php', 'pedido.php', 'gerarrota.php']);
 // Verifica se está em uma página de fornecedor para manter submenu aberto
@@ -615,6 +616,11 @@ $isRelatoriosPage = in_array($currentPage, ['ranking.php']);
                 <span class="icon">👥</span>
                 <span class="label">Clientes</span>
                 <span class="tooltip">Clientes</span>
+            </a>
+            <a href="fornecedor.php" class="nav-link <?php echo $currentPage === 'fornecedor.php' ? 'active' : ''; ?>">
+                <span class="icon">🏭</span>
+                <span class="label">Fornecedores</span>
+                <span class="tooltip">Fornecedores</span>
             </a>
         </div>
 
