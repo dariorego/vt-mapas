@@ -121,7 +121,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'clientes') {
 // Carrega listas iniciais
 try {
     $fornecedores = $db->query("SELECT id, descricao FROM prod_vt.fornecedor ORDER BY descricao");
-    $clientes = $db->query("SELECT id, nome, fone, CONCAT(nome, COALESCE(CONCAT(' - ', fone), '')) as nome_telefone FROM prod_vt.cliente ORDER BY nome LIMIT 1000");
+    $clientes = $db->query("SELECT id, nome, fone, CONCAT(nome, COALESCE(CONCAT(' - ', fone), '')) as nome_telefone FROM prod_vt.cliente ORDER BY nome");
 } catch (Exception $e) {
 }
 
@@ -229,6 +229,25 @@ foreach ($resultados as $row) {
             background: var(--bg);
             color: var(--text);
             -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Page Header */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .page-header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         /* Main */
@@ -744,6 +763,9 @@ foreach ($resultados as $row) {
     <?php include 'includes/sidebar.php'; ?>
 
     <main class="main page-with-sidebar">
+        <div class="page-header">
+            <h1>✅ Validar Fornecedor</h1>
+        </div>
         <div class="filter-card">
             <form method="POST" action="" id="filterForm">
                 <div class="filter-row">

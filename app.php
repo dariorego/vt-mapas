@@ -32,8 +32,7 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
             --border: #E5E7EB;
             --sidebar-width: 240px;
             --sidebar-collapsed: 60px;
-            --header-height: 40px;
-            --tab-height: 36px;
+            --tab-height: 38px;
         }
 
         * {
@@ -42,7 +41,8 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
             box-sizing: border-box;
         }
 
-        html, body {
+        html,
+        body {
             height: 100%;
             overflow: hidden;
         }
@@ -54,7 +54,7 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
             display: flex;
         }
 
-        /* Sidebar */
+        /* ===== SIDEBAR ===== */
         .sidebar {
             width: var(--sidebar-width);
             height: 100vh;
@@ -65,6 +65,7 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
             transition: width 0.3s ease;
             flex-shrink: 0;
             position: relative;
+            z-index: 100;
         }
 
         .sidebar.collapsed {
@@ -73,7 +74,7 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
 
         .sidebar-header {
             padding: 16px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             display: flex;
             align-items: center;
             gap: 12px;
@@ -120,8 +121,8 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-            z-index: 10;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+            z-index: 101;
             transition: all 0.2s;
         }
 
@@ -151,6 +152,16 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
             flex: 1;
             padding: 12px 0;
             overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .sidebar-nav::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .sidebar-nav::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
         }
 
         .nav-section {
@@ -178,11 +189,21 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
             border-left: 3px solid transparent;
             transition: all 0.2s;
             position: relative;
+            font-size: 0.88rem;
         }
 
         .nav-item:hover {
-            background: rgba(255,255,255,0.1);
-            border-left-color: rgba(255,255,255,0.5);
+            background: rgba(255, 255, 255, 0.1);
+            border-left-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .nav-item.tab-open {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .nav-item.tab-active {
+            background: rgba(255, 255, 255, 0.15);
+            border-left-color: #fff;
         }
 
         .nav-item .icon {
@@ -216,7 +237,18 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
             visibility: hidden;
             transform: translateX(-5px);
             transition: all 0.2s;
-            z-index: 100;
+            z-index: 200;
+            pointer-events: none;
+        }
+
+        .nav-item .tooltip::before {
+            content: '';
+            position: absolute;
+            left: -6px;
+            top: 50%;
+            transform: translateY(-50%);
+            border: 6px solid transparent;
+            border-right-color: #1a1a2e;
         }
 
         .sidebar.collapsed .nav-item:hover .tooltip {
@@ -240,10 +272,11 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
             border-left: 3px solid transparent;
             transition: all 0.2s;
             position: relative;
+            font-size: 0.88rem;
         }
 
         .nav-submenu-toggle:hover {
-            background: rgba(255,255,255,0.1);
+            background: rgba(255, 255, 255, 0.1);
         }
 
         .nav-submenu-toggle .icon {
@@ -269,6 +302,7 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
             width: 14px;
             height: 14px;
             stroke: white;
+            fill: none;
             transition: transform 0.2s;
         }
 
@@ -276,20 +310,43 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
             transform: rotate(90deg);
         }
 
+        .nav-submenu-toggle .tooltip {
+            position: absolute;
+            left: calc(var(--sidebar-collapsed) + 8px);
+            background: #1a1a2e;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateX(-5px);
+            transition: all 0.2s;
+            z-index: 200;
+            pointer-events: none;
+        }
+
+        .sidebar.collapsed .nav-submenu-toggle:hover .tooltip {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(0);
+        }
+
         .nav-submenu {
             max-height: 0;
             overflow: hidden;
             transition: max-height 0.3s ease;
-            background: rgba(0,0,0,0.1);
+            background: rgba(0, 0, 0, 0.1);
         }
 
         .nav-submenu.open {
-            max-height: 200px;
+            max-height: 300px;
         }
 
         .nav-submenu .nav-item {
             padding-left: 44px;
-            font-size: 0.85rem;
+            font-size: 0.82rem;
         }
 
         .sidebar.collapsed .nav-submenu {
@@ -299,7 +356,7 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
         /* User */
         .sidebar-user {
             padding: 12px 16px;
-            border-top: 1px solid rgba(255,255,255,0.1);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
             display: flex;
             align-items: center;
             gap: 10px;
@@ -308,7 +365,7 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
         .user-avatar {
             width: 28px;
             height: 28px;
-            background: rgba(255,255,255,0.2);
+            background: rgba(255, 255, 255, 0.2);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -336,95 +393,134 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
             opacity: 0.7;
         }
 
-        /* Main Area */
+        .sidebar-footer {
+            padding: 10px 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.65rem;
+            opacity: 0.5;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .sidebar.collapsed .sidebar-footer {
+            opacity: 0;
+        }
+
+        /* ===== MAIN AREA ===== */
         .main-area {
             flex: 1;
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            min-width: 0;
         }
 
-        /* Tabs Bar */
+        /* ===== TABS BAR ===== */
         .tabs-bar {
             height: var(--tab-height);
-            background: #e8ebee;
+            min-height: var(--tab-height);
+            background: #dee2e6;
             display: flex;
             align-items: flex-end;
-            padding: 0 8px;
-            gap: 2px;
-            border-bottom: 1px solid var(--border);
+            padding: 0 4px;
+            gap: 1px;
+            border-bottom: 1px solid #c9cdd2;
             overflow-x: auto;
+            overflow-y: hidden;
             flex-shrink: 0;
+            scrollbar-width: none;
         }
 
         .tabs-bar::-webkit-scrollbar {
-            height: 3px;
-        }
-
-        .tabs-bar::-webkit-scrollbar-thumb {
-            background: var(--border);
-            border-radius: 2px;
+            height: 0;
         }
 
         .tab {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
-            background: #d8dce0;
-            border-radius: 6px 6px 0 0;
-            font-size: 0.8rem;
+            gap: 6px;
+            padding: 7px 10px 7px 12px;
+            background: #c8cdd2;
+            border-radius: 8px 8px 0 0;
+            font-size: 0.78rem;
+            font-weight: 500;
             color: var(--text-muted);
             cursor: pointer;
             white-space: nowrap;
-            max-width: 180px;
-            transition: all 0.2s;
-            border: 1px solid transparent;
+            max-width: 190px;
+            min-width: 100px;
+            transition: all 0.15s;
+            border: 1px solid #b8bdc3;
             border-bottom: none;
+            position: relative;
+            user-select: none;
         }
 
         .tab:hover {
-            background: #cfd4d9;
+            background: #d5d9de;
         }
 
         .tab.active {
             background: white;
             color: var(--text);
-            border-color: var(--border);
+            font-weight: 600;
+            border-color: #c9cdd2;
+            z-index: 1;
+        }
+
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: white;
         }
 
         .tab .tab-icon {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
+            flex-shrink: 0;
         }
 
         .tab .tab-title {
             overflow: hidden;
             text-overflow: ellipsis;
+            flex: 1;
         }
 
         .tab .tab-close {
-            width: 16px;
-            height: 16px;
-            border-radius: 3px;
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.9rem;
-            color: var(--text-muted);
+            font-size: 1rem;
+            line-height: 1;
+            color: #999;
             transition: all 0.15s;
             flex-shrink: 0;
+            opacity: 0;
+        }
+
+        .tab:hover .tab-close,
+        .tab.active .tab-close {
+            opacity: 1;
         }
 
         .tab .tab-close:hover {
-            background: rgba(0,0,0,0.1);
-            color: #d32f2f;
+            background: rgba(220, 53, 69, 0.15);
+            color: #dc3545;
         }
 
-        /* Content Area */
+        /* ===== CONTENT AREA ===== */
         .content-area {
             flex: 1;
             background: white;
             position: relative;
+            overflow: hidden;
         }
 
         .tab-content {
@@ -455,10 +551,10 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
             padding: 40px;
         }
 
-        .empty-state .icon {
+        .empty-state .es-icon {
             font-size: 4rem;
             margin-bottom: 16px;
-            opacity: 0.5;
+            opacity: 0.4;
         }
 
         .empty-state h2 {
@@ -471,27 +567,7 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
             font-size: 0.9rem;
         }
 
-        /* Mobile */
-        @media (max-width: 768px) {
-            .sidebar {
-                position: fixed;
-                z-index: 1000;
-                transform: translateX(-100%);
-            }
-
-            .sidebar.mobile-open {
-                transform: translateX(0);
-            }
-
-            .sidebar-toggle {
-                display: none;
-            }
-
-            .mobile-header {
-                display: flex !important;
-            }
-        }
-
+        /* ===== MOBILE ===== */
         .mobile-header {
             display: none;
             height: 48px;
@@ -500,6 +576,7 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
             align-items: center;
             padding: 0 12px;
             gap: 12px;
+            flex-shrink: 0;
         }
 
         .mobile-header button {
@@ -519,12 +596,43 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
             display: none;
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 999;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 99;
         }
 
         .sidebar-overlay.active {
             display: block;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                z-index: 1000;
+                transform: translateX(-100%);
+                width: var(--sidebar-width) !important;
+            }
+
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+
+            .sidebar-toggle {
+                display: none;
+            }
+
+            .sidebar.collapsed .sidebar-brand,
+            .sidebar.collapsed .nav-item .label,
+            .sidebar.collapsed .nav-section,
+            .sidebar.collapsed .sidebar-footer,
+            .sidebar.collapsed .user-info,
+            .sidebar.collapsed .nav-submenu-toggle .label,
+            .sidebar.collapsed .nav-submenu-toggle .chevron {
+                opacity: 1;
+            }
+
+            .mobile-header {
+                display: flex !important;
+            }
         }
     </style>
 </head>
@@ -558,22 +666,12 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
                 <span class="tooltip">Início</span>
             </div>
 
-            <div class="nav-item" data-page="gerarrota.php" data-title="Gerar Rota" data-icon="🗺️">
-                <span class="icon">🗺️</span>
-                <span class="label">Gerar Rota</span>
-                <span class="tooltip">Gerar Rota</span>
-            </div>
-
-            <div class="nav-item" data-page="validafornecedor.php" data-title="Validar Fornecedor" data-icon="📦">
-                <span class="icon">📦</span>
-                <span class="label">Validar Fornecedor</span>
-                <span class="tooltip">Validar Fornecedor</span>
-            </div>
-
-            <button class="nav-submenu-toggle" id="cadastrosToggle">
+            <!-- Cadastros Submenu -->
+            <button class="nav-submenu-toggle" data-submenu="cadastrosSubmenu">
                 <span class="icon">📋</span>
                 <span class="label">Cadastros</span>
-                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="9 18 15 12 9 6"></polyline>
                 </svg>
                 <span class="tooltip">Cadastros</span>
@@ -583,14 +681,87 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
                     <span class="icon">🚗</span>
                     <span class="label">Motoristas</span>
                 </div>
+                <div class="nav-item" data-page="cliente.php" data-title="Clientes" data-icon="👥">
+                    <span class="icon">👥</span>
+                    <span class="label">Clientes</span>
+                </div>
+                <div class="nav-item" data-page="fornecedor.php" data-title="Fornecedores" data-icon="🏭">
+                    <span class="icon">🏭</span>
+                    <span class="label">Fornecedores</span>
+                </div>
+            </div>
+
+            <!-- Viagens Submenu -->
+            <button class="nav-submenu-toggle" data-submenu="viagensSubmenu">
+                <span class="icon">🚐</span>
+                <span class="label">Viagens</span>
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+                <span class="tooltip">Viagens</span>
+            </button>
+            <div class="nav-submenu" id="viagensSubmenu">
+                <div class="nav-item" data-page="viagem.php" data-title="Relação de Viagem" data-icon="📋">
+                    <span class="icon">📋</span>
+                    <span class="label">Relação de Viagem</span>
+                </div>
+                <div class="nav-item" data-page="pedido.php" data-title="Pedidos" data-icon="📦">
+                    <span class="icon">📦</span>
+                    <span class="label">Pedidos</span>
+                </div>
+                <div class="nav-item" data-page="gerarrota.php" data-title="Gerar Rota" data-icon="🗺️">
+                    <span class="icon">🗺️</span>
+                    <span class="label">Gerar Rota</span>
+                </div>
+            </div>
+
+            <!-- Fornecedor Submenu -->
+            <button class="nav-submenu-toggle" data-submenu="fornecedorSubmenu">
+                <span class="icon">🏭</span>
+                <span class="label">Fornecedor</span>
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+                <span class="tooltip">Fornecedor</span>
+            </button>
+            <div class="nav-submenu" id="fornecedorSubmenu">
+                <div class="nav-item" data-page="validafornecedor.php" data-title="Validar Fornecedor" data-icon="📦">
+                    <span class="icon">📦</span>
+                    <span class="label">Validar Fornecedor</span>
+                </div>
+            </div>
+
+            <!-- Relatórios Submenu -->
+            <button class="nav-submenu-toggle" data-submenu="relatoriosSubmenu">
+                <span class="icon">📊</span>
+                <span class="label">Relatórios</span>
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+                <span class="tooltip">Relatórios</span>
+            </button>
+            <div class="nav-submenu" id="relatoriosSubmenu">
+                <div class="nav-item" data-page="ranking.php" data-title="Ranking" data-icon="🏆">
+                    <span class="icon">🏆</span>
+                    <span class="label">Ranking</span>
+                </div>
+            </div>
+
+            <div class="nav-item" data-page="configuracoes.php" data-title="Configurações" data-icon="⚙️">
+                <span class="icon">⚙️</span>
+                <span class="label">Configurações</span>
+                <span class="tooltip">Configurações</span>
             </div>
 
             <?php if ($isAdmin): ?>
-            <div class="nav-item" data-page="sobre.php" data-title="Sobre" data-icon="ℹ️">
-                <span class="icon">ℹ️</span>
-                <span class="label">Sobre</span>
-                <span class="tooltip">Sobre</span>
-            </div>
+                <div class="nav-item" data-page="sobre.php" data-title="Sobre" data-icon="ℹ️">
+                    <span class="icon">ℹ️</span>
+                    <span class="label">Sobre</span>
+                    <span class="tooltip">Sobre</span>
+                </div>
             <?php endif; ?>
 
             <div class="nav-section">Conta</div>
@@ -609,6 +780,10 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
                 <div class="user-role"><?php echo $isAdmin ? 'Administrador' : 'Usuário'; ?></div>
             </div>
         </div>
+
+        <div class="sidebar-footer">
+            © 2026 Victor Transportes
+        </div>
     </aside>
 
     <!-- Main Area -->
@@ -620,14 +795,12 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
         </div>
 
         <!-- Tabs Bar -->
-        <div class="tabs-bar" id="tabsBar">
-            <!-- Tabs will be inserted here dynamically -->
-        </div>
+        <div class="tabs-bar" id="tabsBar"></div>
 
         <!-- Content Area -->
         <div class="content-area" id="contentArea">
             <div class="empty-state" id="emptyState">
-                <div class="icon">📂</div>
+                <div class="es-icon">📂</div>
                 <h2>Nenhuma aba aberta</h2>
                 <p>Clique em um item do menu para abrir uma nova aba</p>
             </div>
@@ -635,43 +808,47 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
     </div>
 
     <script>
-        // Tab State
+        // ===== TAB STATE =====
         const tabs = [];
         let activeTabId = null;
 
-        // DOM Elements
+        // DOM
         const sidebar = document.getElementById('sidebar');
         const tabsBar = document.getElementById('tabsBar');
         const contentArea = document.getElementById('contentArea');
         const emptyState = document.getElementById('emptyState');
 
-        // Sidebar Toggle
+        // ===== SIDEBAR TOGGLE =====
+        const SIDEBAR_KEY = 'vt_app_sidebar_collapsed';
         document.getElementById('sidebarToggle').addEventListener('click', () => {
             sidebar.classList.toggle('collapsed');
-            localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+            localStorage.setItem(SIDEBAR_KEY, sidebar.classList.contains('collapsed'));
         });
 
-        // Load sidebar state
-        if (localStorage.getItem('sidebarCollapsed') === 'true') {
+        if (localStorage.getItem(SIDEBAR_KEY) === 'true') {
             sidebar.classList.add('collapsed');
         }
 
-        // Submenu Toggle
-        document.getElementById('cadastrosToggle').addEventListener('click', () => {
-            const toggle = document.getElementById('cadastrosToggle');
-            const submenu = document.getElementById('cadastrosSubmenu');
-            toggle.classList.toggle('open');
-            submenu.classList.toggle('open');
-            localStorage.setItem('submenuOpen', submenu.classList.contains('open'));
+        // ===== SUBMENU TOGGLES =====
+        document.querySelectorAll('.nav-submenu-toggle').forEach(toggle => {
+            const submenuId = toggle.dataset.submenu;
+            const submenu = document.getElementById(submenuId);
+            if (!submenu) return;
+
+            const storageKey = 'vt_app_sub_' + submenuId;
+            if (localStorage.getItem(storageKey) === 'true') {
+                toggle.classList.add('open');
+                submenu.classList.add('open');
+            }
+
+            toggle.addEventListener('click', () => {
+                const isOpen = toggle.classList.toggle('open');
+                submenu.classList.toggle('open', isOpen);
+                localStorage.setItem(storageKey, isOpen);
+            });
         });
 
-        // Load submenu state
-        if (localStorage.getItem('submenuOpen') === 'true') {
-            document.getElementById('cadastrosToggle').classList.add('open');
-            document.getElementById('cadastrosSubmenu').classList.add('open');
-        }
-
-        // Nav Item Click - Open Tab
+        // ===== NAV ITEM CLICK =====
         document.querySelectorAll('.nav-item[data-page]').forEach(item => {
             item.addEventListener('click', () => {
                 const page = item.dataset.page;
@@ -682,29 +859,37 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
             });
         });
 
-        // Open Tab
+        // ===== OPEN TAB =====
         function openTab(page, title, icon) {
-            // Check if tab already exists
             let tab = tabs.find(t => t.page === page);
-            
+
             if (!tab) {
-                // Create new tab
                 const id = 'tab-' + Date.now();
                 tab = { id, page, title, icon };
                 tabs.push(tab);
-                
+
                 // Create tab element
                 const tabEl = document.createElement('div');
                 tabEl.className = 'tab';
                 tabEl.dataset.id = id;
+                tabEl.dataset.page = page;
                 tabEl.innerHTML = `
                     <span class="tab-icon">${icon}</span>
                     <span class="tab-title">${title}</span>
                     <span class="tab-close" onclick="event.stopPropagation(); closeTab('${id}')">×</span>
                 `;
                 tabEl.addEventListener('click', () => activateTab(id));
+
+                // Middle click to close
+                tabEl.addEventListener('mousedown', (e) => {
+                    if (e.button === 1) {
+                        e.preventDefault();
+                        closeTab(id);
+                    }
+                });
+
                 tabsBar.appendChild(tabEl);
-                
+
                 // Create content iframe
                 const content = document.createElement('div');
                 content.className = 'tab-content';
@@ -712,67 +897,128 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
                 content.innerHTML = `<iframe src="${page}?notabs=1"></iframe>`;
                 contentArea.appendChild(content);
             }
-            
-            // Activate the tab
+
             activateTab(tab.id);
+            saveTabs();
         }
 
-        // Activate Tab
+        // ===== ACTIVATE TAB =====
         function activateTab(id) {
             activeTabId = id;
-            
+
             // Update tab elements
             document.querySelectorAll('.tab').forEach(t => {
                 t.classList.toggle('active', t.dataset.id === id);
             });
-            
+
             // Update content
             document.querySelectorAll('.tab-content').forEach(c => {
                 c.classList.toggle('active', c.dataset.id === id);
             });
-            
+
             // Hide empty state
             emptyState.style.display = 'none';
+
+            // Update sidebar highlights
+            updateSidebarHighlights();
+
+            // Scroll active tab into view
+            const activeTab = document.querySelector(`.tab[data-id="${id}"]`);
+            if (activeTab) {
+                activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+            }
+
+            saveTabs();
         }
 
-        // Close Tab
+        // ===== CLOSE TAB =====
         function closeTab(id) {
             const index = tabs.findIndex(t => t.id === id);
             if (index === -1) return;
-            
-            // Remove from array
+
             tabs.splice(index, 1);
-            
-            // Remove DOM elements
+
             document.querySelector(`.tab[data-id="${id}"]`)?.remove();
             document.querySelector(`.tab-content[data-id="${id}"]`)?.remove();
-            
-            // If this was active tab, activate another
+
             if (activeTabId === id) {
                 if (tabs.length > 0) {
-                    // Activate previous or next tab
                     const newIndex = Math.min(index, tabs.length - 1);
                     activateTab(tabs[newIndex].id);
                 } else {
                     activeTabId = null;
                     emptyState.style.display = 'flex';
+                    updateSidebarHighlights();
                 }
             }
+
+            saveTabs();
         }
 
-        // Mobile Sidebar
+        // ===== SIDEBAR HIGHLIGHTS =====
+        function updateSidebarHighlights() {
+            const openPages = tabs.map(t => t.page);
+            const activeTab = tabs.find(t => t.id === activeTabId);
+            const activePage = activeTab ? activeTab.page : null;
+
+            document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+                const page = item.dataset.page;
+                item.classList.remove('tab-open', 'tab-active');
+                if (page === activePage) {
+                    item.classList.add('tab-active');
+                } else if (openPages.includes(page)) {
+                    item.classList.add('tab-open');
+                }
+            });
+        }
+
+        // ===== PERSIST TABS =====
+        function saveTabs() {
+            const state = {
+                tabs: tabs.map(t => ({ page: t.page, title: t.title, icon: t.icon })),
+                activePage: tabs.find(t => t.id === activeTabId)?.page || null
+            };
+            localStorage.setItem('vt_app_tabs', JSON.stringify(state));
+        }
+
+        function loadTabs() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('vt_app_tabs'));
+                if (saved && saved.tabs && saved.tabs.length > 0) {
+                    saved.tabs.forEach(t => openTab(t.page, t.title, t.icon));
+                    if (saved.activePage) {
+                        const tab = tabs.find(t => t.page === saved.activePage);
+                        if (tab) activateTab(tab.id);
+                    }
+                    return true;
+                }
+            } catch (e) { }
+            return false;
+        }
+
+        // ===== MOBILE SIDEBAR =====
         function openMobileSidebar() {
             sidebar.classList.add('mobile-open');
             document.getElementById('sidebarOverlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
         }
 
         function closeMobileSidebar() {
             sidebar.classList.remove('mobile-open');
             document.getElementById('sidebarOverlay').classList.remove('active');
+            document.body.style.overflow = '';
         }
 
-        // Open Home tab by default
-        openTab('index.php', 'Início', '🏠');
+        // Keyboard: Escape closes mobile sidebar
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeMobileSidebar();
+        });
+
+        // ===== INIT =====
+        const restored = loadTabs();
+        if (!restored) {
+            openTab('index.php', 'Início', '🏠');
+        }
     </script>
 </body>
 

@@ -10,7 +10,7 @@ session_start();
 
 // Se já está logado, redireciona
 if (isset($_SESSION['user_id'])) {
-    header('Location: index.php');
+    header('Location: app.php');
     exit;
 }
 
@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $_SESSION['user_is_admin'] = (bool) $user['priv_admin'];
                         $_SESSION['login_time'] = time();
 
-                        header('Location: index.php');
+                        header('Location: app.php');
                         exit;
                     }
                 }
