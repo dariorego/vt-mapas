@@ -23,13 +23,14 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
         $search = $_GET['search'] ?? '';
         $sortCol = $_GET['sort'] ?? 'data_viagem';
         $sortDir = strtoupper($_GET['dir'] ?? 'DESC') === 'ASC' ? 'ASC' : 'DESC';
+        $filtroDataInicio = $_GET['data_inicio'] ?? '';
+        $filtroDataFim = $_GET['data_fim'] ?? '';
+        $filtroMotorista = $_GET['motorista_id'] ?? '';
 
-        // Validar coluna de ordenação
         $allowedCols = ['id', 'data_viagem', 'motorista_nome', 'situacao_nome', 'qde_pedido'];
         if (!in_array($sortCol, $allowedCols))
             $sortCol = 'data_viagem';
 
-        // Map sort columns to actual SQL columns
         $sortMap = [
             'id' => 'v.id',
             'data_viagem' => 'v.data_viagem',
@@ -53,16 +54,102 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
                 LEFT JOIN remessa_situacao rs ON rs.id = v.remessa_situacao_id
                 WHERE 1=1";
 
+        if (!empty($filtroDataInicio)) {
+            $sql .= " AND DATE(v.data_viagem) >= :data_inicio";
+            $params[':data_inicio'] = $filtroDataInicio;
+        }
+        if (!empty($filtroDataFim)) {
+            $sql .= " AND DATE(v.data_viagem) <= :data_fim";
+            $params[':data_fim'] = $filtroDataFim;
+        }
+        if (!empty($filtroMotorista)) {
+            $sql .= " AND v.motorista_id = :motorista_id";
+            $params[':motorista_id'] = intval($filtroMotorista);
+        }
         if (!empty($search)) {
             $sql .= " AND (m.nome LIKE :search OR CAST(v.id AS CHAR) LIKE :search2)";
             $params[':search'] = "%{$search}%";
             $params[':search2'] = "%{$search}%";
         }
 
+        $page = max(1, intval($_GET['page'] ?? 1));
+        $perPage = 20;
+        $offset = ($page - 1) * $perPage;
+
         $sql .= " ORDER BY {$sqlSort} {$sortDir}";
 
+        // Total count for pagination (same query without LIMIT)
+        $countSql = "SELECT COUNT(*) as total FROM viagem v
+                LEFT JOIN prod_vt.motorista m ON m.id = v.motorista_id
+                LEFT JOIN remessa_situacao rs ON rs.id = v.remessa_situacao_id
+                WHERE 1=1";
+        // Rebuild WHERE conditions for count
+        $countParams = [];
+        if (!empty($filtroDataInicio)) {
+            $countSql .= " AND DATE(v.data_viagem) >= :data_inicio";
+            $countParams[':data_inicio'] = $filtroDataInicio;
+        }
+        if (!empty($filtroDataFim)) {
+            $countSql .= " AND DATE(v.data_viagem) <= :data_fim";
+            $countParams[':data_fim'] = $filtroDataFim;
+        }
+        if (!empty($filtroMotorista)) {
+            $countSql .= " AND v.motorista_id = :motorista_id";
+            $countParams[':motorista_id'] = intval($filtroMotorista);
+        }
+        if (!empty($search)) {
+            $countSql .= " AND (m.nome LIKE :search OR CAST(v.id AS CHAR) LIKE :search2)";
+            $countParams[':search'] = "%{$search}%";
+            $countParams[':search2'] = "%{$search}%";
+        }
+        $countResult = $db->queryOne($countSql, $countParams);
+        $totalRecords = $countResult ? intval($countResult['total']) : 0;
+        $totalPages = max(1, ceil($totalRecords / $perPage));
+
+        // Stats query: totals for the filtered set
+        $statsSql = "SELECT COUNT(*) as total_viagens,
+                     COALESCE(SUM((SELECT COUNT(*) FROM remessa r WHERE r.viagem_id = v.id)), 0) as total_pedidos
+                     FROM viagem v
+                     LEFT JOIN prod_vt.motorista m ON m.id = v.motorista_id
+                     LEFT JOIN remessa_situacao rs ON rs.id = v.remessa_situacao_id
+                     WHERE 1=1";
+        $statsParams = [];
+        if (!empty($filtroDataInicio)) {
+            $statsSql .= " AND DATE(v.data_viagem) >= :data_inicio";
+            $statsParams[':data_inicio'] = $filtroDataInicio;
+        }
+        if (!empty($filtroDataFim)) {
+            $statsSql .= " AND DATE(v.data_viagem) <= :data_fim";
+            $statsParams[':data_fim'] = $filtroDataFim;
+        }
+        if (!empty($filtroMotorista)) {
+            $statsSql .= " AND v.motorista_id = :motorista_id";
+            $statsParams[':motorista_id'] = intval($filtroMotorista);
+        }
+        if (!empty($search)) {
+            $statsSql .= " AND (m.nome LIKE :search OR CAST(v.id AS CHAR) LIKE :search2)";
+            $statsParams[':search'] = "%{$search}%";
+            $statsParams[':search2'] = "%{$search}%";
+        }
+        $statsResult = $db->queryOne($statsSql, $statsParams);
+
+        $sql .= " LIMIT {$perPage} OFFSET {$offset}";
+
         $viagens = $db->query($sql, $params);
-        echo json_encode(['success' => true, 'data' => $viagens]);
+        echo json_encode([
+            'success' => true,
+            'data' => $viagens,
+            'pagination' => [
+                'page' => $page,
+                'perPage' => $perPage,
+                'totalRecords' => $totalRecords,
+                'totalPages' => $totalPages
+            ],
+            'stats' => [
+                'totalViagens' => $statsResult ? intval($statsResult['total_viagens']) : 0,
+                'totalPedidos' => $statsResult ? intval($statsResult['total_pedidos']) : 0
+            ]
+        ]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
@@ -94,6 +181,32 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'motoristas') {
     header('Content-Type: application/json');
     try {
         $motoristas = $db->query("SELECT id, nome FROM prod_vt.motorista WHERE situacao = 'a' ORDER BY nome");
+        echo json_encode(['success' => true, 'data' => $motoristas]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// AJAX: Listar motoristas que possuem viagens no período
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'motoristas_periodo') {
+    header('Content-Type: application/json');
+    try {
+        $params = [];
+        $sql = "SELECT DISTINCT m.id, m.nome 
+                FROM viagem v
+                INNER JOIN prod_vt.motorista m ON m.id = v.motorista_id
+                WHERE 1=1";
+        if (!empty($_GET['data_inicio'])) {
+            $sql .= " AND DATE(v.data_viagem) >= :data_inicio";
+            $params[':data_inicio'] = $_GET['data_inicio'];
+        }
+        if (!empty($_GET['data_fim'])) {
+            $sql .= " AND DATE(v.data_viagem) <= :data_fim";
+            $params[':data_fim'] = $_GET['data_fim'];
+        }
+        $sql .= " ORDER BY m.nome";
+        $motoristas = $db->query($sql, $params);
         echo json_encode(['success' => true, 'data' => $motoristas]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -292,25 +405,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             border-radius: 12px;
             margin-bottom: 20px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .filter-row {
             display: flex;
             gap: 12px;
             flex-wrap: wrap;
-            align-items: center;
+            align-items: flex-end;
         }
 
-        .filter-bar input {
+        .filter-row + .filter-row {
+            margin-top: 12px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
             flex: 1;
-            min-width: 200px;
+            min-width: 150px;
+        }
+
+        .filter-group label {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-group input,
+        .filter-group select {
             padding: 10px 14px;
             border: 1px solid var(--border);
             border-radius: 8px;
             font-size: 0.9rem;
+            width: 100%;
         }
 
-        .filter-bar input:focus {
+        .filter-group input:focus,
+        .filter-group select:focus {
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(31, 111, 84, 0.1);
+        }
+
+        .filter-group .loading-indicator {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: none;
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+            min-width: auto;
         }
 
         /* Stats Bar */
@@ -520,6 +670,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             background: #bbf7d0;
         }
 
+        a.action-btn {
+            text-decoration: none;
+        }
+
         /* Modal */
         .modal-overlay {
             position: fixed;
@@ -671,12 +825,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                 align-items: flex-start;
             }
 
-            .filter-bar {
-                flex-direction: column;
-            }
-
-            .filter-bar input {
-                width: 100%;
+            .filter-group {
+                min-width: 100%;
             }
 
             .table-container {
@@ -694,6 +844,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             .stats-bar {
                 flex-direction: column;
             }
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 16px;
+            background: var(--card);
+            border-radius: 0 0 12px 12px;
+            border-top: 1px solid var(--border);
+            margin-top: -1px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .pagination-info {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .pagination-controls {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .page-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            color: var(--text);
+        }
+
+        .page-btn:hover:not(:disabled) {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: var(--primary-bg);
+        }
+
+        .page-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .page-btn:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+
+        .page-ellipsis {
+            padding: 6px 8px;
+            color: var(--text-muted);
+            font-size: 0.85rem;
         }
     </style>
 </head>
@@ -735,8 +944,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         </div>
 
         <div class="filter-bar">
-            <input type="text" id="searchInput" placeholder="🔍 Buscar por motorista ou código..." oninput="debounceSearch()">
-            <button class="btn btn-secondary" onclick="loadViagens()">🔄 Atualizar</button>
+            <div class="filter-row">
+                <div class="filter-group" style="max-width:180px;">
+                    <label>Data Início</label>
+                    <input type="date" id="filterDataInicio">
+                </div>
+                <div class="filter-group" style="max-width:180px;">
+                    <label>Data Fim</label>
+                    <input type="date" id="filterDataFim">
+                </div>
+                <div class="filter-group" style="max-width:250px;">
+                    <label>Motorista <span class="loading-indicator" id="loadingMotorista">🔄</span></label>
+                    <select id="filterMotorista">
+                        <option value="">Todos os motoristas</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Busca</label>
+                    <input type="text" id="searchInput" placeholder="🔍 Buscar por nome ou código..." oninput="debounceSearch()">
+                </div>
+                <div class="filter-actions">
+                    <button class="btn btn-primary" onclick="loadViagens()">🔍 Filtrar</button>
+                    <button class="btn btn-secondary" onclick="clearFilters()">🧹 Limpar</button>
+                </div>
+            </div>
         </div>
 
         <div class="table-container">
@@ -767,6 +998,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                     </tr>
                 </tbody>
             </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination" id="paginationBar">
+            <div class="pagination-info" id="paginationInfo"></div>
+            <div class="pagination-controls" id="paginationControls"></div>
         </div>
     </main>
 
@@ -840,13 +1077,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         let motoristasCache = [];
         let situacoesCache = [];
 
-        // Carrega dados na inicialização
+        let currentPage = 1;
+        const PER_PAGE = 20;
+
+        // ===== INIT =====
         document.addEventListener('DOMContentLoaded', () => {
+            setDefaultDates();
+            loadFilterMotoristas();
             loadViagens();
             loadSelectData();
+
+            document.getElementById('filterDataInicio').addEventListener('change', () => {
+                currentPage = 1;
+                loadFilterMotoristas();
+                loadViagens();
+            });
+            document.getElementById('filterDataFim').addEventListener('change', () => {
+                currentPage = 1;
+                loadFilterMotoristas();
+                loadViagens();
+            });
+            document.getElementById('filterMotorista').addEventListener('change', () => {
+                currentPage = 1;
+                loadViagens();
+            });
         });
 
-        // Carregar dados para selects
+        function setDefaultDates() {
+            const hoje = new Date();
+            const dia = hoje.getDay();
+            const diffSeg = dia === 0 ? -6 : 1 - dia;
+            const segunda = new Date(hoje);
+            segunda.setDate(hoje.getDate() + diffSeg);
+            const sabado = new Date(segunda);
+            sabado.setDate(segunda.getDate() + 5);
+
+            document.getElementById('filterDataInicio').value = segunda.toISOString().split('T')[0];
+            document.getElementById('filterDataFim').value = sabado.toISOString().split('T')[0];
+        }
+
+        async function loadFilterMotoristas() {
+            const dataInicio = document.getElementById('filterDataInicio').value;
+            const dataFim = document.getElementById('filterDataFim').value;
+            const select = document.getElementById('filterMotorista');
+            const loading = document.getElementById('loadingMotorista');
+            const currentVal = select.value;
+
+            loading.style.display = 'inline';
+            try {
+                let url = 'viagem.php?ajax=motoristas_periodo';
+                if (dataInicio) url += `&data_inicio=${dataInicio}`;
+                if (dataFim) url += `&data_fim=${dataFim}`;
+
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (data.success) {
+                    select.innerHTML = '<option value="">Todos os motoristas</option>' +
+                        data.data.map(m => `<option value="${m.id}">${escapeHtml(m.nome)}</option>`).join('');
+                    
+                    if (currentVal && data.data.find(m => m.id == currentVal)) {
+                        select.value = currentVal;
+                    }
+                }
+            } catch (e) {
+                console.error('Erro ao carregar motoristas:', e);
+            }
+            loading.style.display = 'none';
+        }
+
+        function clearFilters() {
+            document.getElementById('filterDataInicio').value = '';
+            document.getElementById('filterDataFim').value = '';
+            document.getElementById('filterMotorista').innerHTML = '<option value="">Todos os motoristas</option>';
+            document.getElementById('searchInput').value = '';
+            currentPage = 1;
+            setDefaultDates();
+            loadFilterMotoristas();
+            loadViagens();
+        }
+
         async function loadSelectData() {
             try {
                 const [motRes, sitRes] = await Promise.all([
@@ -874,28 +1184,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             }
         }
 
-        // Carregar viagens
+        // ===== CARREGAR VIAGENS =====
         async function loadViagens() {
             const search = document.getElementById('searchInput').value;
+            const dataInicio = document.getElementById('filterDataInicio').value;
+            const dataFim = document.getElementById('filterDataFim').value;
+            const motorista = document.getElementById('filterMotorista').value;
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = '<tr><td colspan="6" class="loading">🔄 Carregando...</td></tr>';
 
             try {
-                const url = `viagem.php?ajax=list&search=${encodeURIComponent(search)}&sort=${currentSort}&dir=${currentDir}`;
+                let url = `viagem.php?ajax=list&search=${encodeURIComponent(search)}&sort=${currentSort}&dir=${currentDir}&page=${currentPage}`;
+                if (dataInicio) url += `&data_inicio=${dataInicio}`;
+                if (dataFim) url += `&data_fim=${dataFim}`;
+                if (motorista) url += `&motorista_id=${motorista}`;
+
                 const res = await fetch(url);
                 const data = await res.json();
 
                 if (!data.success) throw new Error(data.error);
 
-                // Update stats
-                updateStats(data.data);
+                // Stats from server
+                if (data.stats) {
+                    document.getElementById('statTotal').textContent = data.stats.totalViagens;
+                    document.getElementById('statPedidos').textContent = data.stats.totalPedidos;
+                    // Viagens hoje from current page data
+                    const today = new Date().toISOString().split('T')[0];
+                    const viagensHoje = data.stats.totalViagens > 0 ? '-' : '0';
+                    document.getElementById('statHoje').textContent = data.pagination.totalRecords;
+                    document.getElementById('statHoje').parentElement.querySelector('.stat-label').textContent = 'No Período';
+                }
+
+                // Pagination
+                renderPagination(data.pagination);
 
                 if (data.data.length === 0) {
                     tbody.innerHTML = `
                         <tr><td colspan="6">
                             <div class="empty-state">
                                 <div class="icon">🚐</div>
-                                <p>Nenhuma viagem encontrada</p>
+                                <p>Nenhuma viagem encontrada no período</p>
                             </div>
                         </td></tr>`;
                     return;
@@ -916,6 +1244,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                         </td>
                         <td>
                             <div class="actions">
+                                <a href="gerarrota.php?viagem_id=${v.id}" class="action-btn view" title="Ver Rota">🗺️</a>
                                 <button class="action-btn edit" onclick="editViagem(${v.id})" title="Editar">✏️</button>
                                 <button class="action-btn delete" onclick="openDeleteModal(${v.id}, '${v.id} - ${formatDate(v.data_viagem)}')" title="Excluir">🗑️</button>
                             </div>
@@ -930,16 +1259,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             }
         }
 
-        // Update stats
-        function updateStats(data) {
-            const today = new Date().toISOString().split('T')[0];
-            const totalViagens = data.length;
-            const totalPedidos = data.reduce((sum, v) => sum + parseInt(v.qde_pedido || 0), 0);
-            const viagensHoje = data.filter(v => v.data_viagem === today).length;
+        // ===== PAGINATION =====
+        function renderPagination(pg) {
+            const info = document.getElementById('paginationInfo');
+            const controls = document.getElementById('paginationControls');
 
-            document.getElementById('statTotal').textContent = totalViagens;
-            document.getElementById('statPedidos').textContent = totalPedidos;
-            document.getElementById('statHoje').textContent = viagensHoje;
+            if (pg.totalRecords === 0) {
+                info.textContent = 'Nenhum registro';
+                controls.innerHTML = '';
+                return;
+            }
+
+            const start = (pg.page - 1) * pg.perPage + 1;
+            const end = Math.min(pg.page * pg.perPage, pg.totalRecords);
+            info.textContent = `Mostrando ${start}-${end} de ${pg.totalRecords} viagens`;
+
+            let html = '';
+            // Prev
+            html += `<button class="page-btn" onclick="goToPage(${pg.page - 1})" ${pg.page <= 1 ? 'disabled' : ''}>◀</button>`;
+
+            // Page numbers
+            const maxButtons = 5;
+            let startPage = Math.max(1, pg.page - Math.floor(maxButtons / 2));
+            let endPage = Math.min(pg.totalPages, startPage + maxButtons - 1);
+            if (endPage - startPage < maxButtons - 1) {
+                startPage = Math.max(1, endPage - maxButtons + 1);
+            }
+
+            if (startPage > 1) {
+                html += `<button class="page-btn" onclick="goToPage(1)">1</button>`;
+                if (startPage > 2) html += `<span class="page-ellipsis">...</span>`;
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<button class="page-btn ${i === pg.page ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+            }
+
+            if (endPage < pg.totalPages) {
+                if (endPage < pg.totalPages - 1) html += `<span class="page-ellipsis">...</span>`;
+                html += `<button class="page-btn" onclick="goToPage(${pg.totalPages})">${pg.totalPages}</button>`;
+            }
+
+            // Next
+            html += `<button class="page-btn" onclick="goToPage(${pg.page + 1})" ${pg.page >= pg.totalPages ? 'disabled' : ''}>▶</button>`;
+
+            controls.innerHTML = html;
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            loadViagens();
+            // Scroll table into view
+            document.querySelector('.table-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         // Format date
@@ -960,6 +1331,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                 currentSort = col;
                 currentDir = col === 'data_viagem' ? 'DESC' : 'ASC';
             }
+            currentPage = 1;
             loadViagens();
         }
 
@@ -979,6 +1351,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         // Debounce search
         function debounceSearch() {
             clearTimeout(searchTimeout);
+            currentPage = 1;
             searchTimeout = setTimeout(loadViagens, 300);
         }
 

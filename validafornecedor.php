@@ -1239,73 +1239,140 @@ foreach ($resultados as $row) {
             }
         }
 
-        // Autocomplete functionality
-        const fornecedores = <?php echo json_encode($fornecedores); ?>;
-        const clientes = <?php echo json_encode($clientes); ?>;
+        // Autocomplete functionality - dados dinâmicos por data
+        let fornecedoresData = [];
+        let clientesData = [];
 
-        function setupAutocomplete(inputId, listId, hiddenId, items, labelKey) {
+        // Carrega fornecedores filtrados por data via AJAX
+        async function loadFornecedores() {
+            const dataInicio = document.getElementById('data_inicio').value;
+            const dataFim = document.getElementById('data_fim').value;
+            const loading = document.getElementById('loadingF');
+            
+            if (!dataInicio || !dataFim) return;
+            
+            loading.style.display = 'inline';
+            try {
+                const url = `validafornecedor.php?ajax=fornecedores&data_inicio=${dataInicio}&data_fim=${dataFim}`;
+                const res = await fetch(url);
+                const json = await res.json();
+                if (json.success) {
+                    fornecedoresData = json.data;
+                    // Limpa seleção atual se o fornecedor não existe mais na lista filtrada
+                    const hiddenVal = document.getElementById('fornecedor_id').value;
+                    if (hiddenVal && !fornecedoresData.find(f => f.id == hiddenVal)) {
+                        document.getElementById('fornecedor_id').value = '';
+                        document.getElementById('fornecedor_search').value = '';
+                    }
+                }
+            } catch (e) {
+                console.error('Erro ao carregar fornecedores:', e);
+            }
+            loading.style.display = 'none';
+        }
+
+        // Carrega clientes filtrados por data via AJAX
+        async function loadClientes() {
+            const dataInicio = document.getElementById('data_inicio').value;
+            const dataFim = document.getElementById('data_fim').value;
+            const loading = document.getElementById('loadingC');
+            
+            if (!dataInicio || !dataFim) return;
+            
+            loading.style.display = 'inline';
+            try {
+                const url = `validafornecedor.php?ajax=clientes&data_inicio=${dataInicio}&data_fim=${dataFim}`;
+                const res = await fetch(url);
+                const json = await res.json();
+                if (json.success) {
+                    clientesData = json.data;
+                    // Limpa seleção atual se o cliente não existe mais na lista filtrada
+                    const hiddenVal = document.getElementById('cliente_id').value;
+                    if (hiddenVal && !clientesData.find(c => c.id == hiddenVal)) {
+                        document.getElementById('cliente_id').value = '';
+                        document.getElementById('cliente_search').value = '';
+                    }
+                }
+            } catch (e) {
+                console.error('Erro ao carregar clientes:', e);
+            }
+            loading.style.display = 'none';
+        }
+
+        // Recarrega ambas as listas quando as datas mudam
+        async function reloadFilterLists() {
+            await Promise.all([loadFornecedores(), loadClientes()]);
+        }
+
+        document.getElementById('data_inicio').addEventListener('change', reloadFilterLists);
+        document.getElementById('data_fim').addEventListener('change', reloadFilterLists);
+
+        function setupAutocomplete(inputId, listId, hiddenId, getItems, labelKey) {
             const input = document.getElementById(inputId);
             const list = document.getElementById(listId);
             const hidden = document.getElementById(hiddenId);
 
             // Set initial value if exists
-            const currentVal = hidden.value;
-            if (currentVal) {
-                const found = items.find(item => item.id == currentVal);
-                if (found) input.value = found[labelKey];
+            function setInitialValue() {
+                const currentVal = hidden.value;
+                if (currentVal) {
+                    const items = getItems();
+                    const found = items.find(item => item.id == currentVal);
+                    if (found) input.value = found[labelKey];
+                }
             }
 
-            input.addEventListener('input', function () {
-                const query = this.value.toLowerCase().trim();
-                hidden.value = ''; // Clear selection when typing
+            function renderList(query) {
+                const items = getItems();
+                const q = (query || '').toLowerCase().trim();
 
-                if (query.length === 0) {
-                    list.classList.remove('active');
-                    return;
-                }
-
-                const allMatches = items.filter(item => {
-                    const label = (item[labelKey] || '').toString().toLowerCase();
-                    return label.includes(query);
-                });
+                const allMatches = q.length === 0
+                    ? items
+                    : items.filter(item => {
+                        const label = (item[labelKey] || '').toString().toLowerCase();
+                        return label.includes(q);
+                    });
                 
                 const totalMatches = allMatches.length;
                 const displayLimit = 50;
                 const filtered = allMatches.slice(0, displayLimit);
 
                 if (filtered.length === 0) {
-                    list.innerHTML = '<div class="autocomplete-item" style="color:#999;">Nenhum resultado encontrado</div>';
+                    list.innerHTML = '<div class="autocomplete-item" style="color:#999;">Nenhum resultado para este período</div>';
                 } else {
                     let html = '';
                     
-                    // Adiciona contador de resultados
-                    if (totalMatches > 1) {
-                        html += `<div class="autocomplete-count">${totalMatches} ${totalMatches === 1 ? 'resultado' : 'resultados'} encontrado${totalMatches === 1 ? '' : 's'}</div>`;
-                    }
+                    html += `<div class="autocomplete-count">${totalMatches} ${totalMatches === 1 ? 'registro' : 'registros'} no período</div>`;
                     
                     html += filtered.map(item => {
                         const label = item[labelKey];
-                        const highlighted = label.replace(
-                            new RegExp(`(${query})`, 'gi'),
-                            '<span class="highlight">$1</span>'
-                        );
-                        return `<div class="autocomplete-item" data-id="${item.id}" data-label="${label}">${highlighted}</div>`;
+                        if (q.length > 0) {
+                            const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                            const highlighted = label.replace(
+                                new RegExp(`(${escaped})`, 'gi'),
+                                '<span class="highlight">$1</span>'
+                            );
+                            return `<div class="autocomplete-item" data-id="${item.id}" data-label="${label}">${highlighted}</div>`;
+                        }
+                        return `<div class="autocomplete-item" data-id="${item.id}" data-label="${label}">${label}</div>`;
                     }).join('');
                     
-                    // Indicador de mais resultados
                     if (totalMatches > displayLimit) {
-                        html += `<div class="autocomplete-more">+ ${totalMatches - displayLimit} resultados não exibidos. Digite mais para refinar.</div>`;
+                        html += `<div class="autocomplete-more">+ ${totalMatches - displayLimit} registros. Digite para refinar.</div>`;
                     }
                     
                     list.innerHTML = html;
                 }
                 list.classList.add('active');
+            }
+
+            input.addEventListener('input', function () {
+                hidden.value = '';
+                renderList(this.value);
             });
 
             input.addEventListener('focus', function () {
-                if (this.value.length > 0) {
-                    this.dispatchEvent(new Event('input'));
-                }
+                renderList(this.value);
             });
 
             list.addEventListener('click', function (e) {
@@ -1321,16 +1388,23 @@ foreach ($resultados as $row) {
                 setTimeout(() => list.classList.remove('active'), 200);
             });
 
-            // Clear button functionality - if user clears input, clear hidden too
             input.addEventListener('keydown', function (e) {
                 if (e.key === 'Escape') {
                     list.classList.remove('active');
                 }
             });
+
+            return { setInitialValue };
         }
 
-        setupAutocomplete('fornecedor_search', 'fornecedor_list', 'fornecedor_id', fornecedores, 'descricao');
-        setupAutocomplete('cliente_search', 'cliente_list', 'cliente_id', clientes, 'nome_telefone');
+        const fornecedorAC = setupAutocomplete('fornecedor_search', 'fornecedor_list', 'fornecedor_id', () => fornecedoresData, 'descricao');
+        const clienteAC = setupAutocomplete('cliente_search', 'cliente_list', 'cliente_id', () => clientesData, 'nome_telefone');
+
+        // Carrega as listas iniciais baseado nas datas padrão e seta valores salvos
+        reloadFilterLists().then(() => {
+            fornecedorAC.setInitialValue();
+            clienteAC.setInitialValue();
+        });
 
         // Auto-submit on status change
         document.querySelectorAll('input[name="status_entrega"]').forEach(radio => {

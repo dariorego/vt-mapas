@@ -1009,6 +1009,19 @@ $currentPage = 'gerarrota.php';
 
         // Inicializa
         initMap();
+
+        // Auto-seleciona viagem se vier via URL (?viagem_id=X)
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const viagemParam = urlParams.get('viagem_id');
+            if (viagemParam) {
+                const select = document.getElementById('viagem_id');
+                if (select.querySelector(`option[value="${viagemParam}"]`)) {
+                    select.value = viagemParam;
+                    select.dispatchEvent(new Event('change'));
+                }
+            }
+        })();
     </script>
 
 

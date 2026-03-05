@@ -894,7 +894,8 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
                 const content = document.createElement('div');
                 content.className = 'tab-content';
                 content.dataset.id = id;
-                content.innerHTML = `<iframe src="${page}?notabs=1"></iframe>`;
+                const separator = page.includes('?') ? '&' : '?';
+                content.innerHTML = `<iframe src="${page}${separator}notabs=1"></iframe>`;
                 contentArea.appendChild(content);
             }
 

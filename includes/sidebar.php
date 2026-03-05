@@ -20,6 +20,28 @@ if (isset($_GET['notabs']) && $_GET['notabs'] === '1') {
     return;
 }
 
+// Detecção via JS: se estiver dentro de um iframe, esconde o sidebar
+echo '<script>
+if (window.self !== window.top) {
+    document.addEventListener("DOMContentLoaded", function() {
+        var sidebar = document.getElementById("sidebar");
+        var overlay = document.getElementById("overlay");
+        var mobileHeader = document.querySelector(".mobile-header");
+        if (sidebar) sidebar.style.display = "none";
+        if (overlay) overlay.style.display = "none";
+        if (mobileHeader) mobileHeader.style.display = "none";
+        document.querySelectorAll(".page-with-sidebar").forEach(function(el) {
+            el.style.marginLeft = "0";
+            el.style.width = "100%";
+            el.style.paddingTop = "0";
+        });
+    });
+}
+</script>';
+// Se estiver num iframe, não renderiza o sidebar HTML
+echo '<script>if(window.self!==window.top){document.write("<style>.sidebar,.mobile-header,#overlay{display:none!important}.page-with-sidebar{margin-left:0!important;width:100%!important;padding-top:0!important}</style>");}</script>';
+
+
 // Detecta a página atual se não foi definida
 if (!isset($currentPage)) {
     $currentPage = basename($_SERVER['PHP_SELF']);
