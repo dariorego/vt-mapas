@@ -1,0 +1,52 @@
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST_SERVER }}
+          username: ${{ secrets.HOST_USER }}
+          key: ${{ secrets.HOST_SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.HOST_SSH_PASSPHRASE }} # Optional, only if key has password
+          # password: ${{ secrets.HOST_PASSWORD }} # Alternative to SSH Key
+          script: |
+            # 1. Ensure target directory exists (this uses the HOST_DEPLOY_PATH secret)
+            mkdir -p ${{ secrets.HOST_DEPLOY_PATH }}
+            cd ${{ secrets.HOST_DEPLOY_PATH }}
+
+            # 2. Check if the project is already cloned via Git, otherwise we just pull
+            if [ -d ".git" ]; then
+              echo "Repository exists. Pulling latest changes..."
+              # Reset any possible local changes on the server and pull
+              git reset --hard HEAD
+              git pull origin main
+            else
+              echo "Repository not found. Please clone the repository manually on the server once or set up SCP transfer."
+              echo "Run this on your server: git clone https://github.com/seu-usuario/vt-mapas.git ."
+              exit 1
+            fi
+
+            # 3. Check if .env exists, if not, warn the user
+            if [ ! -f ".env" ]; then
+              echo "WARNING: .env file not found in ${{ secrets.HOST_DEPLOY_PATH }}!"
+              echo "Docker compose might fail if it depends on it. Please create it manually."
+            fi
+
+            # 4. Rebuild and restart Docker containers
+            docker compose down
+            docker compose up -d --build
+
+            # 5. Clean up old images to save space
+            docker image prune -a -f

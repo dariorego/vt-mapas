@@ -7,10 +7,7 @@ services:
     restart: always
     ports:
       - "80:80"
-    environment:
-      - DB_HOST=seu_db_host
-      - DB_NAME=prod_vt
-      - DB_USER=seu_usuario
-      - DB_PASS=sua_senha
+    env_file:
+      - .env
     volumes:
       - ./data:/var/www/html/data
