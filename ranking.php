@@ -219,6 +219,13 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking_fornecedores') {
         tr:nth-child(even) { background:#fafbfc; }
         tr:nth-child(even):hover { background:#f0f1f2; }
 
+        /* Sort indicator */
+        th .sort-arrow { margin-left:4px; font-size:0.65rem; opacity:0.4; transition:opacity 0.2s; }
+        th.sorted .sort-arrow { opacity:1; }
+        th.sorted-asc .sort-arrow::after { content:'▲'; }
+        th.sorted-desc .sort-arrow::after { content:'▼'; }
+        th:not(.sorted) .sort-arrow::after { content:'⇅'; }
+
         /* Rank Medals */
         .rank-medal { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; font-weight:800; font-size:0.9rem; }
         .rank-medal.gold { background:linear-gradient(135deg, #F59E0B, #D97706); color:white; box-shadow:0 2px 8px rgba(245,158,11,0.4); }
@@ -353,12 +360,12 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking_fornecedores') {
                 <table>
                     <thead><tr>
                         <th style="width:60px;text-align:center">#</th>
-                        <th>CLIENTE</th>
-                        <th style="width:100px;text-align:center">PEDIDOS</th>
-                        <th style="width:100px;text-align:center">PACOTES</th>
-                        <th style="width:130px;text-align:right">VALOR (R$)</th>
+                        <th data-sort="nome" data-type="string">CLIENTE <span class="sort-arrow"></span></th>
+                        <th data-sort="total_pedidos" data-type="number" style="width:100px;text-align:center">PEDIDOS <span class="sort-arrow"></span></th>
+                        <th data-sort="total_pacotes" data-type="number" style="width:100px;text-align:center">PACOTES <span class="sort-arrow"></span></th>
+                        <th data-sort="valor_total" data-type="number" style="width:130px;text-align:right">VALOR (R$) <span class="sort-arrow"></span></th>
                         <th style="width:140px;text-align:center">%</th>
-                        <th style="width:120px;text-align:center">ÚLTIMO USO</th>
+                        <th data-sort="ultimo_uso" data-type="date" style="width:120px;text-align:center">ÚLTIMO USO <span class="sort-arrow"></span></th>
                         <th style="width:60px;text-align:center">ZAP</th>
                     </tr></thead>
                     <tbody id="tableClientes"><tr><td colspan="8" class="loading">🔄 Carregando...</td></tr></tbody>
@@ -386,13 +393,13 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking_fornecedores') {
                 <table>
                     <thead><tr>
                         <th style="width:60px;text-align:center">#</th>
-                        <th>FORNECEDOR</th>
-                        <th style="width:100px;text-align:center">ENTREGAS</th>
-                        <th style="width:100px;text-align:center">QUANTIDADE</th>
-                        <th style="width:100px;text-align:center">CLIENTES</th>
+                        <th data-sort="nome" data-type="string">FORNECEDOR <span class="sort-arrow"></span></th>
+                        <th data-sort="total_entregas" data-type="number" style="width:100px;text-align:center">ENTREGAS <span class="sort-arrow"></span></th>
+                        <th data-sort="total_quantidade" data-type="number" style="width:100px;text-align:center">QUANTIDADE <span class="sort-arrow"></span></th>
+                        <th data-sort="total_clientes_atendidos" data-type="number" style="width:100px;text-align:center">CLIENTES <span class="sort-arrow"></span></th>
                         <th style="width:140px;text-align:center">%</th>
-                        <th style="width:110px;text-align:center">ENTREGUES</th>
-                        <th style="width:120px;text-align:center">ÚLTIMO USO</th>
+                        <th data-sort="total_entregues" data-type="number" style="width:110px;text-align:center">ENTREGUES <span class="sort-arrow"></span></th>
+                        <th data-sort="ultimo_uso" data-type="date" style="width:120px;text-align:center">ÚLTIMO USO <span class="sort-arrow"></span></th>
                     </tr></thead>
                     <tbody id="tableFornecedores"><tr><td colspan="8" class="loading">🔄 Carregando...</td></tr></tbody>
                 </table>
@@ -406,9 +413,13 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking_fornecedores') {
     let currentTab = 'clientes';
     let currentPreset = 'este_ano';
     let filterDataInicio = '', filterDataFim = '';
+    let cachedClientes = [];
+    let cachedFornecedores = [];
+    let sortState = { clientes: { col: null, dir: 'desc' }, fornecedores: { col: null, dir: 'desc' } };
 
     document.addEventListener('DOMContentLoaded', () => {
         setPreset('este_ano');
+        initSortableHeaders();
     });
 
     // ===== PRESETS =====
@@ -512,51 +523,56 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking_fornecedores') {
             document.getElementById('statValorTotal').textContent = formatCurrency(totais.valor_total || 0);
             document.getElementById('tabCountClientes').textContent = items.length;
 
-            if (items.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">📊</div><p>Nenhum dado encontrado para o período selecionado</p></div></td></tr>';
-                return;
-            }
-
-            const maxPedidos = items[0]?.total_pedidos || 1;
-
-            tbody.innerHTML = items.map((c, i) => {
-                const pct = ((c.total_pedidos / maxPedidos) * 100).toFixed(1);
-                const medalClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'normal';
-                const foneClean = (c.fone || '').replace(/\D/g, '');
-                const hasPhone = foneClean.length >= 10;
-                const dateBadge = getDateBadge(c.ultimo_uso);
-
-                return `<tr class="animate-row" style="animation-delay:${i*30}ms">
-                    <td style="text-align:center"><span class="rank-medal ${medalClass}">${i+1}</span></td>
-                    <td>
-                        <div class="entity-name">${esc(c.nome)}</div>
-                        <div class="entity-sub">${esc(c.endereco || '')}</div>
-                    </td>
-                    <td style="text-align:center"><strong>${formatNumber(c.total_pedidos)}</strong></td>
-                    <td style="text-align:center">${formatNumber(c.total_pacotes)}</td>
-                    <td style="text-align:right"><strong>${formatCurrency(c.valor_total)}</strong></td>
-                    <td>
-                        <div style="display:flex;align-items:center;gap:8px;">
-                            <div class="progress-bar"><div class="progress-fill green" style="width:${pct}%"></div></div>
-                            <span style="font-size:0.75rem;font-weight:600;color:var(--text-muted);min-width:40px">${pct}%</span>
-                        </div>
-                    </td>
-                    <td style="text-align:center"><span class="date-badge ${dateBadge.cls}">${dateBadge.text}</span></td>
-                    <td style="text-align:center">
-                        ${hasPhone
-                            ? `<a href="https://wa.me/55${foneClean}" target="_blank" class="whatsapp-link" title="${esc(c.fone)}">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                               </a>`
-                            : '<span style="color:#ccc">—</span>'
-                        }
-                    </td>
-                </tr>`;
-            }).join('');
+            cachedClientes = items;
+            renderClientes(items);
 
         } catch(e) {
             tbody.innerHTML = `<tr><td colspan="8" class="empty-state">❌ ${esc(e.message)}</td></tr>`;
             showToast(e.message, 'error');
         }
+    }
+
+    function renderClientes(items) {
+        const tbody = document.getElementById('tableClientes');
+        if (items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">📊</div><p>Nenhum dado encontrado para o período selecionado</p></div></td></tr>';
+            return;
+        }
+        const maxPedidos = Math.max(...items.map(c => parseInt(c.total_pedidos) || 0), 1);
+
+        tbody.innerHTML = items.map((c, i) => {
+            const pct = ((c.total_pedidos / maxPedidos) * 100).toFixed(1);
+            const medalClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'normal';
+            const foneClean = (c.fone || '').replace(/\D/g, '');
+            const hasPhone = foneClean.length >= 10;
+            const dateBadge = getDateBadge(c.ultimo_uso);
+
+            return `<tr class="animate-row" style="animation-delay:${i*30}ms">
+                <td style="text-align:center"><span class="rank-medal ${medalClass}">${i+1}</span></td>
+                <td>
+                    <div class="entity-name">${esc(c.nome)}</div>
+                    <div class="entity-sub">${esc(c.endereco || '')}</div>
+                </td>
+                <td style="text-align:center"><strong>${formatNumber(c.total_pedidos)}</strong></td>
+                <td style="text-align:center">${formatNumber(c.total_pacotes)}</td>
+                <td style="text-align:right"><strong>${formatCurrency(c.valor_total)}</strong></td>
+                <td>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div class="progress-bar"><div class="progress-fill green" style="width:${pct}%"></div></div>
+                        <span style="font-size:0.75rem;font-weight:600;color:var(--text-muted);min-width:40px">${pct}%</span>
+                    </div>
+                </td>
+                <td style="text-align:center"><span class="date-badge ${dateBadge.cls}">${dateBadge.text}</span></td>
+                <td style="text-align:center">
+                    ${hasPhone
+                        ? `<a href="https://wa.me/55${foneClean}" target="_blank" class="whatsapp-link" title="${esc(c.fone)}">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                           </a>`
+                        : '<span style="color:#ccc">—</span>'
+                    }
+                </td>
+            </tr>`;
+        }).join('');
     }
 
     async function loadRankingFornecedores() {
@@ -577,47 +593,52 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking_fornecedores') {
             document.getElementById('statTotalQde').textContent = formatNumber(totais.total_quantidade || 0);
             document.getElementById('tabCountFornecedores').textContent = items.length;
 
-            if (items.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">📊</div><p>Nenhum dado encontrado para o período selecionado</p></div></td></tr>';
-                return;
-            }
-
-            const maxEntregas = items[0]?.total_entregas || 1;
-
-            tbody.innerHTML = items.map((f, i) => {
-                const pct = ((f.total_entregas / maxEntregas) * 100).toFixed(1);
-                const medalClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'normal';
-                const dateBadge = getDateBadge(f.ultimo_uso);
-                const entreguesPct = f.total_entregas > 0 ? Math.round((f.total_entregues / f.total_entregas) * 100) : 0;
-
-                return `<tr class="animate-row" style="animation-delay:${i*30}ms">
-                    <td style="text-align:center"><span class="rank-medal ${medalClass}">${i+1}</span></td>
-                    <td>
-                        <div class="entity-name">${esc(f.nome)}</div>
-                        <div class="entity-sub">${f.total_clientes_atendidos} clientes atendidos</div>
-                    </td>
-                    <td style="text-align:center"><strong>${formatNumber(f.total_entregas)}</strong></td>
-                    <td style="text-align:center">${formatNumber(f.total_quantidade)}</td>
-                    <td style="text-align:center">${formatNumber(f.total_clientes_atendidos)}</td>
-                    <td>
-                        <div style="display:flex;align-items:center;gap:8px;">
-                            <div class="progress-bar"><div class="progress-fill blue" style="width:${pct}%"></div></div>
-                            <span style="font-size:0.75rem;font-weight:600;color:var(--text-muted);min-width:40px">${pct}%</span>
-                        </div>
-                    </td>
-                    <td style="text-align:center">
-                        <span style="font-size:0.8rem; font-weight:600; color:${entreguesPct >= 80 ? 'var(--success)' : entreguesPct >= 50 ? 'var(--warning)' : 'var(--danger)'}">
-                            ${entreguesPct}% <span style="font-weight:400;color:var(--text-muted)">(${f.total_entregues}/${f.total_entregas})</span>
-                        </span>
-                    </td>
-                    <td style="text-align:center"><span class="date-badge ${dateBadge.cls}">${dateBadge.text}</span></td>
-                </tr>`;
-            }).join('');
+            cachedFornecedores = items;
+            renderFornecedores(items);
 
         } catch(e) {
             tbody.innerHTML = `<tr><td colspan="8" class="empty-state">❌ ${esc(e.message)}</td></tr>`;
             showToast(e.message, 'error');
         }
+    }
+
+    function renderFornecedores(items) {
+        const tbody = document.getElementById('tableFornecedores');
+        if (items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">📊</div><p>Nenhum dado encontrado para o período selecionado</p></div></td></tr>';
+            return;
+        }
+        const maxEntregas = Math.max(...items.map(f => parseInt(f.total_entregas) || 0), 1);
+
+        tbody.innerHTML = items.map((f, i) => {
+            const pct = ((f.total_entregas / maxEntregas) * 100).toFixed(1);
+            const medalClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'normal';
+            const dateBadge = getDateBadge(f.ultimo_uso);
+            const entreguesPct = f.total_entregas > 0 ? Math.round((f.total_entregues / f.total_entregas) * 100) : 0;
+
+            return `<tr class="animate-row" style="animation-delay:${i*30}ms">
+                <td style="text-align:center"><span class="rank-medal ${medalClass}">${i+1}</span></td>
+                <td>
+                    <div class="entity-name">${esc(f.nome)}</div>
+                    <div class="entity-sub">${f.total_clientes_atendidos} clientes atendidos</div>
+                </td>
+                <td style="text-align:center"><strong>${formatNumber(f.total_entregas)}</strong></td>
+                <td style="text-align:center">${formatNumber(f.total_quantidade)}</td>
+                <td style="text-align:center">${formatNumber(f.total_clientes_atendidos)}</td>
+                <td>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div class="progress-bar"><div class="progress-fill blue" style="width:${pct}%"></div></div>
+                        <span style="font-size:0.75rem;font-weight:600;color:var(--text-muted);min-width:40px">${pct}%</span>
+                    </div>
+                </td>
+                <td style="text-align:center">
+                    <span style="font-size:0.8rem; font-weight:600; color:${entreguesPct >= 80 ? 'var(--success)' : entreguesPct >= 50 ? 'var(--warning)' : 'var(--danger)'}">
+                        ${entreguesPct}% <span style="font-weight:400;color:var(--text-muted)">(${f.total_entregues}/${f.total_entregas})</span>
+                    </span>
+                </td>
+                <td style="text-align:center"><span class="date-badge ${dateBadge.cls}">${dateBadge.text}</span></td>
+            </tr>`;
+        }).join('');
     }
 
     // ===== UTILS =====
@@ -653,6 +674,51 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking_fornecedores') {
         const d = document.createElement('div');
         d.textContent = t;
         return d.innerHTML;
+    }
+
+    // ===== SORTING =====
+    function initSortableHeaders() {
+        document.querySelectorAll('th[data-sort]').forEach(th => {
+            th.addEventListener('click', () => {
+                const col = th.dataset.sort;
+                const type = th.dataset.type || 'string';
+                const table = th.closest('.tab-content, .table-container');
+                const tabId = th.closest('.tab-content')?.id;
+                const tabKey = tabId === 'contentClientes' ? 'clientes' : 'fornecedores';
+
+                // Toggle direction
+                if (sortState[tabKey].col === col) {
+                    sortState[tabKey].dir = sortState[tabKey].dir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    sortState[tabKey].col = col;
+                    sortState[tabKey].dir = 'asc';
+                }
+
+                // Update header styles
+                th.closest('thead').querySelectorAll('th').forEach(h => {
+                    h.classList.remove('sorted', 'sorted-asc', 'sorted-desc');
+                });
+                th.classList.add('sorted', `sorted-${sortState[tabKey].dir}`);
+
+                // Sort cached data
+                const data = tabKey === 'clientes' ? [...cachedClientes] : [...cachedFornecedores];
+                const dir = sortState[tabKey].dir === 'asc' ? 1 : -1;
+
+                data.sort((a, b) => {
+                    let valA = a[col], valB = b[col];
+                    if (type === 'number') {
+                        return (parseFloat(valA || 0) - parseFloat(valB || 0)) * dir;
+                    } else if (type === 'date') {
+                        return ((new Date(valA || 0)) - (new Date(valB || 0))) * dir;
+                    } else {
+                        return (valA || '').toString().localeCompare((valB || '').toString(), 'pt-BR', { sensitivity: 'base' }) * dir;
+                    }
+                });
+
+                if (tabKey === 'clientes') renderClientes(data);
+                else renderFornecedores(data);
+            });
+        });
     }
     </script>
 </body>
