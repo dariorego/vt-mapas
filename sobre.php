@@ -38,8 +38,8 @@ try {
     <?php $currentPage = 'sobre.php'; ?>
     <style>
         :root {
-            --primary: #1F6F50;
-            --primary-dark: #16523c;
+            --primary: #2E9D6F;
+            --primary-dark: #248C5A;
             --secondary: #2c3e50;
             --bg: #f4f7f6;
             --card: #ffffff;

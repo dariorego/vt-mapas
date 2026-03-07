@@ -81,8 +81,8 @@ $isRelatoriosPage = in_array($currentPage, ['ranking.php']);
     :root {
         --sidebar-width: 260px;
         --sidebar-collapsed-width: 72px;
-        --sidebar-bg-start: #1F6F50;
-        --sidebar-bg-end: #16523c;
+        --sidebar-bg-start: #2E9D6F;
+        --sidebar-bg-end: #248C5A;
         --sidebar-transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 

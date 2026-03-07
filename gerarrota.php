@@ -178,8 +178,8 @@ $currentPage = 'gerarrota.php';
 
     <style>
         :root {
-            --primary-color: #1F6F50;
-            --primary-dark: #16523c;
+            --primary-color: #2E9D6F;
+            --primary-dark: #248C5A;
             --secondary-color: #2c3e50;
             --background-color: #f4f7f6;
             --card-background: #ffffff;
@@ -583,7 +583,7 @@ $currentPage = 'gerarrota.php';
             }
 
             if (pointsToDraw.length > 0) {
-                polyline = L.polyline(pointsToDraw, { color: '#1F6F50', weight: 4, opacity: 0.8 }).addTo(map);
+                polyline = L.polyline(pointsToDraw, { color: '#2E9D6F', weight: 4, opacity: 0.8 }).addTo(map);
             }
         }
 
@@ -607,7 +607,7 @@ $currentPage = 'gerarrota.php';
         function createNumberIcon(num) {
             return L.divIcon({
                 className: 'custom-marker',
-                html: `<div style='background-color:#1F6F50; color:white; border-radius:50%; width:28px; height:28px; display:flex; justify-content:center; align-items:center; font-weight:bold; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3);'>${num}</div>`,
+                html: `<div style='background-color:#2E9D6F; color:white; border-radius:50%; width:28px; height:28px; display:flex; justify-content:center; align-items:center; font-weight:bold; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3);'>${num}</div>`,
                 iconSize: [28, 28], iconAnchor: [14, 14]
             });
         }

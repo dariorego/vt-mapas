@@ -22,8 +22,8 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
     <title>Victor Transportes - Sistema de Gestão</title>
     <style>
         :root {
-            --primary: #1F6F50;
-            --primary-dark: #16523c;
+            --primary: #2E9D6F;
+            --primary-dark: #248C5A;
             --primary-light: #2A9D6C;
             --bg: #f4f7f6;
             --card: #ffffff;
