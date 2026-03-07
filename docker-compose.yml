@@ -5,9 +5,23 @@ services:
     build: .
     container_name: vt-mapas-app
     restart: always
-    ports:
-      - "80:80"
+    # ports:
+    #   - "80:80"
     env_file:
       - .env
     volumes:
       - ./data:/var/www/html/data
+    networks:
+      - traefik-public
+      - default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.vtmapas.rule=Host(`vt.logapp.com.br`)"
+      - "traefik.http.routers.vtmapas.entrypoints=websecure"
+      - "traefik.http.routers.vtmapas.tls.certresolver=letsencrypt"
+      - "traefik.http.services.vtmapas.loadbalancer.server.port=80"
+      - "traefik.docker.network=traefik-public"
+
+networks:
+  traefik-public:
+    external: true
