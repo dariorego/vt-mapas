@@ -1,0 +1,21 @@
+name: Inspect Server
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect Traefik
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST_SERVER }}
+          username: ${{ secrets.HOST_USER }}
+          password: ${{ secrets.HOST_PASSWORD }}
+          script: |
+            echo "--- DOCKER NETWORKS ---"
+            docker network ls
+            echo "--- TRAEFIK CONTAINER ---"
+            docker ps | grep traefik || true
+            echo "--- TRAEFIK DETAILS ---"
+            docker inspect $(docker ps -q -f name=traefik) || true
