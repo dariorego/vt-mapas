@@ -18,9 +18,9 @@ jobs:
         with:
           host: ${{ secrets.HOST_SERVER }}
           username: ${{ secrets.HOST_USER }}
-          key: ${{ secrets.HOST_SSH_PRIVATE_KEY }}
-          passphrase: ${{ secrets.HOST_SSH_PASSPHRASE }} # Optional, only if key has password
-          # password: ${{ secrets.HOST_PASSWORD }} # Alternative to SSH Key
+          # key: ${{ secrets.HOST_SSH_PRIVATE_KEY }}
+          # passphrase: ${{ secrets.HOST_SSH_PASSPHRASE }} # Optional, only if key has password
+          password: ${{ secrets.HOST_PASSWORD }} # Alternative to SSH Key
           script: |
             # 1. Ensure target directory exists (this uses the HOST_DEPLOY_PATH secret)
             mkdir -p ${{ secrets.HOST_DEPLOY_PATH }}
