@@ -168,6 +168,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             box-shadow: 0 0 0 3px rgba(31, 111, 80, 0.1);
         }
 
+        .password-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .password-wrapper input {
+            padding-right: 45px;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 15px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            transition: opacity 0.3s;
+            opacity: 0.6;
+            color: var(--text);
+        }
+
+        .toggle-password:hover {
+            opacity: 1;
+        }
+
         .btn-login {
             width: 100%;
             padding: 16px;
@@ -233,7 +263,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <div class="form-group">
                 <label for="password">Senha</label>
-                <input type="password" id="password" name="password" placeholder="Digite sua senha" required>
+                <div class="password-wrapper">
+                    <input type="password" id="password" name="password" placeholder="Digite sua senha" required>
+                    <button type="button" class="toggle-password" id="togglePassword" aria-label="Mostrar senha" title="Mostrar senha">
+                        👁️
+                    </button>
+                </div>
             </div>
 
             <button type="submit" class="btn-login">Entrar</button>
@@ -241,6 +276,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <p class="footer-text">© 2026 Victor Transportes</p>
         </form>
     </div>
+
+    <script>
+        document.getElementById('togglePassword').addEventListener('click', function() {
+            const passwordInput = document.getElementById('password');
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            
+            this.textContent = type === 'password' ? '👁️' : '🙈';
+        });
+    </script>
 </body>
 
 </html>
