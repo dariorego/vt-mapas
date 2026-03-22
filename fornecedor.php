@@ -36,9 +36,11 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
             $params[':s5'] = "%{$search}%";
         }
         if (!empty($situacao)) {
-            $where .= " AND (situacao = :sit OR (situacao IS NULL AND :sit2 = 'Ativo'))";
-            $params[':sit']  = $situacao;
-            $params[':sit2'] = $situacao;
+            if ($situacao === 'Ativo') {
+                $where .= " AND (situacao IN ('Ativo','ativo','a','1') OR situacao IS NULL OR situacao = '')";
+            } else {
+                $where .= " AND situacao IN ('Inativo','inativo','i','2')";
+            }
         }
 
         $total = (int) $db->queryOne("SELECT COUNT(*) as n {$where}", $params)['n'];
@@ -441,8 +443,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             }
 
             tbody.innerHTML = data.data.map((f) => {
-                let sit = (f.situacao || '').toLowerCase();
-                const isAtivo = sit === 'a' || sit === 'ativo' || sit === '';
+                let sit = (f.situacao || '').toLowerCase().trim();
+                const isAtivo = sit === 'a' || sit === 'ativo' || sit === '1' || sit === '';
                 return `<tr>
                     <td>${f.id}</td>
                     <td><strong>${esc(f.descricao || '')}</strong></td>
@@ -522,9 +524,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             document.getElementById('f_contato_nome').value = f.contato_nome || '';
             document.getElementById('f_contato_fone').value = f.contato_fone || '';
             document.getElementById('f_endereco').value = f.endereco || '';
-            let sit = (f.situacao || '').toLowerCase();
-            if (sit === 'a' || sit === 'ativo' || sit === '') sit = 'Ativo';
-            else if (sit === 'i' || sit === 'inativo') sit = 'Inativo';
+            let sit = (f.situacao || '').toLowerCase().trim();
+            if (sit === 'a' || sit === 'ativo' || sit === '1' || sit === '') sit = 'Ativo';
+            else if (sit === 'i' || sit === 'inativo' || sit === '2') sit = 'Inativo';
             else sit = 'Ativo';
             const radio = document.querySelector(`input[name="f_situacao"][value="${sit}"]`);
             if (radio) radio.checked = true;
