@@ -1,0 +1,27 @@
+{
+    "hero": {
+        "badge": "Pernambuco — Entregas com pontualidade",
+        "titulo": "Sua encomenda entregue com segurança e no prazo",
+        "subtitulo": "A Victor Transportes leva seus pacotes até a porta do cliente em Recife e nas principais cidades de Pernambuco."
+    },
+    "servicos": [
+        {"icone": "📦", "titulo": "Entrega de Encomendas", "descricao": "Transportamos seus pacotes com cuidado e responsabilidade, garantindo que cheguem no prazo combinado e em perfeito estado.", "ativo": true},
+        {"icone": "🗺️", "titulo": "Cobertura em Pernambuco", "descricao": "Atendemos Recife e as principais cidades do interior: Caruaru, Petrolina, Garanhuns, Palmares, Vitória de Santo Antão e região.", "ativo": true},
+        {"icone": "📍", "titulo": "Rastreamento em Tempo Real", "descricao": "Acompanhe sua encomenda pelo celular e saiba exatamente quando o entregador está chegando na sua porta.", "ativo": true},
+        {"icone": "✅", "titulo": "Controle de Entrega", "descricao": "Registramos cada entrega com confirmação digital, data, hora e forma de pagamento — total transparência para você e para seu negócio.", "ativo": true},
+        {"icone": "💳", "titulo": "Flexibilidade no Pagamento", "descricao": "Aceitamos diversas formas de pagamento na entrega: dinheiro, PIX e outros — com praticidade para o cliente final.", "ativo": true},
+        {"icone": "🤝", "titulo": "Parceria com Empresas", "descricao": "Atendemos lojas, distribuidores e e-commerces que precisam de uma solução confiável para a última milha das suas entregas.", "ativo": true}
+    ],
+    "cidades": [
+        "Recife", "Olinda", "Caruaru", "Petrolina", "Garanhuns",
+        "Palmares", "Vitória de Santo Antão", "Cabo de Santo Agostinho",
+        "Paulista", "Camaragibe", "Jaboatão dos Guararapes", "São Lourenço da Mata",
+        "Igarassu", "Abreu e Lima", "Gravatá", "Bezerros"
+    ],
+    "contato": {
+        "titulo": "Fale conosco",
+        "subtitulo": "Entre em contato para saber mais sobre nossos serviços ou solicitar uma coleta.",
+        "email": "",
+        "endereco": ""
+    }
+}

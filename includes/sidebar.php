@@ -64,6 +64,7 @@ $pageTitles = [
     'pedido.php' => '📦 Pedidos',
     'ranking.php' => '🏆 Ranking',
     'configuracoes.php' => '⚙️ Configurações',
+    'landing_config.php' => '🌐 Landing Page',
     'sobre.php' => 'ℹ️ Sobre'
 ];
 $pageTitle = $pageTitles[$currentPage] ?? '🚚 Victor Transportes';
@@ -714,6 +715,12 @@ $isRelatoriosPage = in_array($currentPage, ['ranking.php']);
                 <span class="tooltip">Ranking</span>
             </a>
         </div>
+
+        <a href="landing_config.php" class="nav-link <?php echo $currentPage === 'landing_config.php' ? 'active' : ''; ?>">
+            <span class="icon">🌐</span>
+            <span class="label">Landing Page</span>
+            <span class="tooltip">Landing Page</span>
+        </a>
 
         <a href="configuracoes.php" class="nav-link <?php echo $currentPage === 'configuracoes.php' ? 'active' : ''; ?>">
             <span class="icon">⚙️</span>

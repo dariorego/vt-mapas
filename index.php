@@ -1,5 +1,14 @@
 <?php
 require_once 'config.php';
+
+// Carrega conteúdo dinâmico da landing
+$landingFile = __DIR__ . '/data/landing.json';
+$landing = file_exists($landingFile) ? (json_decode(file_get_contents($landingFile), true) ?: []) : [];
+
+$hero     = $landing['hero']     ?? [];
+$servicos = array_filter($landing['servicos'] ?? [], fn($s) => $s['ativo'] ?? true);
+$cidades  = $landing['cidades']  ?? [];
+$contato  = $landing['contato']  ?? [];
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -244,9 +253,9 @@ require_once 'config.php';
 
 <!-- Hero -->
 <section class="hero">
-    <div class="hero-badge">Pernambuco — Entregas com pontualidade</div>
-    <h1>Sua encomenda entregue<br><span>com segurança e no prazo</span></h1>
-    <p>A Victor Transportes leva seus pacotes até a porta do cliente em Recife e nas principais cidades de Pernambuco.</p>
+    <div class="hero-badge"><?php echo htmlspecialchars($hero['badge'] ?? 'Pernambuco — Entregas com pontualidade'); ?></div>
+    <h1><?php echo nl2br(htmlspecialchars($hero['titulo'] ?? 'Sua encomenda entregue com segurança e no prazo')); ?></h1>
+    <p><?php echo htmlspecialchars($hero['subtitulo'] ?? ''); ?></p>
     <div class="hero-btns">
         <a href="/minhaentrega" class="btn-primary">📦 Rastrear minha entrega</a>
         <a href="#contato" class="btn-outline">Falar conosco</a>
@@ -275,36 +284,13 @@ require_once 'config.php';
         <p class="section-sub">Somos especializados na entrega de encomendas com agilidade, segurança e pontualidade em Pernambuco.</p>
 
         <div class="services-grid">
+            <?php foreach ($servicos as $s): ?>
             <div class="service-card">
-                <div class="service-icon">📦</div>
-                <h3>Entrega de Encomendas</h3>
-                <p>Transportamos seus pacotes com cuidado e responsabilidade, garantindo que cheguem no prazo combinado e em perfeito estado.</p>
+                <div class="service-icon"><?php echo htmlspecialchars($s['icone']); ?></div>
+                <h3><?php echo htmlspecialchars($s['titulo']); ?></h3>
+                <p><?php echo htmlspecialchars($s['descricao']); ?></p>
             </div>
-            <div class="service-card">
-                <div class="service-icon">🗺️</div>
-                <h3>Cobertura em Pernambuco</h3>
-                <p>Atendemos Recife e as principais cidades do interior: Caruaru, Petrolina, Garanhuns, Palmares, Vitória de Santo Antão e região.</p>
-            </div>
-            <div class="service-card">
-                <div class="service-icon">📍</div>
-                <h3>Rastreamento em Tempo Real</h3>
-                <p>Acompanhe sua encomenda pelo celular e saiba exatamente quando o entregador está chegando na sua porta.</p>
-            </div>
-            <div class="service-card">
-                <div class="service-icon">✅</div>
-                <h3>Controle de Entrega</h3>
-                <p>Registramos cada entrega com confirmação digital, data, hora e forma de pagamento — total transparência para você e para seu negócio.</p>
-            </div>
-            <div class="service-card">
-                <div class="service-icon">💳</div>
-                <h3>Flexibilidade no Pagamento</h3>
-                <p>Aceitamos diversas formas de pagamento na entrega: dinheiro, PIX e outros — com praticidade para o cliente final.</p>
-            </div>
-            <div class="service-card">
-                <div class="service-icon">🤝</div>
-                <h3>Parceria com Empresas</h3>
-                <p>Atendemos lojas, distribuidores e e-commerces que precisam de uma solução confiável para a última milha das suas entregas.</p>
-            </div>
+            <?php endforeach; ?>
         </div>
     </div>
 </section>
@@ -317,14 +303,7 @@ require_once 'config.php';
         <p class="section-sub">Cobertura nas principais cidades de Pernambuco.</p>
 
         <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:10px;">
-            <?php
-            $cidades = [
-                'Recife','Olinda','Caruaru','Petrolina','Garanhuns',
-                'Palmares','Vitória de Santo Antão','Cabo de Santo Agostinho',
-                'Paulista','Camaragibe','Jaboatão dos Guararapes','São Lourenço da Mata',
-                'Igarassu','Abreu e Lima','Gravatá','Bezerros',
-            ];
-            foreach ($cidades as $cidade): ?>
+            <?php foreach ($cidades as $cidade): ?>
                 <span style="
                     background: var(--gray);
                     border: 1px solid #e0e0e0;
@@ -333,7 +312,7 @@ require_once 'config.php';
                     font-size: 0.88rem;
                     color: #444;
                     display:flex; align-items:center; gap:6px;
-                ">📍 <?php echo $cidade; ?></span>
+                ">📍 <?php echo htmlspecialchars($cidade); ?></span>
             <?php endforeach; ?>
             <span style="
                 background: linear-gradient(135deg, var(--primary), var(--primary-d));
@@ -355,8 +334,8 @@ require_once 'config.php';
 <section id="contato">
     <div class="container">
         <div class="section-tag">Contato</div>
-        <h2>Fale conosco</h2>
-        <p class="section-sub">Entre em contato para saber mais sobre nossos serviços.</p>
+        <h2><?php echo htmlspecialchars($contato['titulo'] ?? 'Fale conosco'); ?></h2>
+        <p class="section-sub"><?php echo htmlspecialchars($contato['subtitulo'] ?? 'Entre em contato para saber mais sobre nossos serviços.'); ?></p>
 
         <div class="contact-grid">
             <?php if (EMPRESA_TELEFONE): ?>
@@ -376,6 +355,24 @@ require_once 'config.php';
                 <a href="https://wa.me/<?php echo htmlspecialchars(EMPRESA_WHATSAPP); ?>" target="_blank">
                     Enviar mensagem
                 </a>
+            </div>
+            <?php endif; ?>
+
+            <?php if (!empty($contato['email'])): ?>
+            <div class="contact-card">
+                <div class="icon">✉️</div>
+                <h4>E-mail</h4>
+                <a href="mailto:<?php echo htmlspecialchars($contato['email']); ?>">
+                    <?php echo htmlspecialchars($contato['email']); ?>
+                </a>
+            </div>
+            <?php endif; ?>
+
+            <?php if (!empty($contato['endereco'])): ?>
+            <div class="contact-card">
+                <div class="icon">📌</div>
+                <h4>Endereço</h4>
+                <span style="font-size:0.88rem;color:#555;"><?php echo htmlspecialchars($contato['endereco']); ?></span>
             </div>
             <?php endif; ?>
 
