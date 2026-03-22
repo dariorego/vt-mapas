@@ -8,3 +8,4 @@ RewriteCond %{REQUEST_FILENAME} !-d
 # Rotas amigáveis
 RewriteRule ^minhaentrega/?$   cliente_tracking.php  [L,QSA]
 RewriteRule ^motorista/?$      motorista_login.php   [L,QSA]
+RewriteRule ^admin/?$          login.php             [L,QSA]

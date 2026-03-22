@@ -660,7 +660,7 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
         <nav class="sidebar-nav">
             <div class="nav-section">Menu</div>
 
-            <div class="nav-item" data-page="index.php" data-title="Início" data-icon="🏠">
+            <div class="nav-item" data-page="dashboard.php" data-title="Início" data-icon="🏠">
                 <span class="icon">🏠</span>
                 <span class="label">Início</span>
                 <span class="tooltip">Início</span>
@@ -1018,7 +1018,7 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
         // ===== INIT =====
         const restored = loadTabs();
         if (!restored) {
-            openTab('index.php', 'Início', '🏠');
+            openTab('dashboard.php', 'Início', '🏠');
         }
     </script>
 </body>

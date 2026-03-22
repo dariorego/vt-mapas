@@ -53,7 +53,7 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
 
 // Define títulos das páginas
 $pageTitles = [
-    'index.php' => '🏠 Início',
+    'dashboard.php' => '🏠 Início',
     'gerarrota.php' => '🗺️ Gerar Rota',
     'validafornecedor.php' => '📦 Validar Fornecedor',
     'optimize_routes.php' => '🛣️ Otimizar Rotas',
@@ -617,7 +617,7 @@ $isRelatoriosPage = in_array($currentPage, ['ranking.php']);
     <nav class="sidebar-nav">
         <div class="nav-section-title">Menu</div>
 
-        <a href="index.php" class="nav-link <?php echo $currentPage === 'index.php' ? 'active' : ''; ?>">
+        <a href="dashboard.php" class="nav-link <?php echo $currentPage === 'dashboard.php' ? 'active' : ''; ?>">
             <span class="icon">🏠</span>
             <span class="label">Início</span>
             <span class="tooltip">Início</span>
