@@ -6,7 +6,7 @@ require_once 'config.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars(EMPRESA_NOME); ?> — Gestão Inteligente de Entregas</title>
+    <title><?php echo htmlspecialchars(EMPRESA_NOME); ?> — Entrega de Encomendas em Pernambuco</title>
     <style>
         :root {
             --primary:   <?php echo EMPRESA_COR_PRIMARIA; ?>;
@@ -235,7 +235,7 @@ require_once 'config.php';
     </a>
     <div class="nav-links">
         <a href="#servicos" class="hide-mobile">Serviços</a>
-        <a href="#como-funciona" class="hide-mobile">Como funciona</a>
+        <a href="#cidades" class="hide-mobile">Cidades</a>
         <a href="#contato" class="hide-mobile">Contato</a>
         <a href="/minhaentrega">Rastrear entrega</a>
         <a href="/admin" class="btn-nav">Área Admin</a>
@@ -244,25 +244,25 @@ require_once 'config.php';
 
 <!-- Hero -->
 <section class="hero">
-    <div class="hero-badge">Gestão Inteligente de Entregas</div>
-    <h1>Entregas mais rápidas,<br><span>clientes mais felizes</span></h1>
-    <p>Otimização de rotas, rastreamento em tempo real e gestão completa da sua operação logística em um só lugar.</p>
+    <div class="hero-badge">Pernambuco — Entregas com pontualidade</div>
+    <h1>Sua encomenda entregue<br><span>com segurança e no prazo</span></h1>
+    <p>A Victor Transportes leva seus pacotes até a porta do cliente em Recife e nas principais cidades de Pernambuco.</p>
     <div class="hero-btns">
         <a href="/minhaentrega" class="btn-primary">📦 Rastrear minha entrega</a>
-        <a href="#servicos" class="btn-outline">Conheça os serviços</a>
+        <a href="#contato" class="btn-outline">Falar conosco</a>
     </div>
     <div class="stats">
         <div class="stat">
+            <div class="stat-num">PE</div>
+            <div class="stat-label">Todo o estado</div>
+        </div>
+        <div class="stat">
             <div class="stat-num">100%</div>
-            <div class="stat-label">Digital</div>
+            <div class="stat-label">Rastreado</div>
         </div>
         <div class="stat">
-            <div class="stat-num">Google</div>
-            <div class="stat-label">Maps integrado</div>
-        </div>
-        <div class="stat">
-            <div class="stat-num">Real time</div>
-            <div class="stat-label">Atualizações</div>
+            <div class="stat-num">No prazo</div>
+            <div class="stat-label">Compromisso</div>
         </div>
     </div>
 </section>
@@ -270,81 +270,76 @@ require_once 'config.php';
 <!-- Serviços -->
 <section id="servicos">
     <div class="container">
-        <div class="section-tag">Serviços</div>
-        <h2>Tudo que sua logística precisa</h2>
-        <p class="section-sub">Da saída do fornecedor até a entrega ao cliente, com controle total em cada etapa.</p>
+        <div class="section-tag">O que fazemos</div>
+        <h2>Entregamos o que importa para você</h2>
+        <p class="section-sub">Somos especializados na entrega de encomendas com agilidade, segurança e pontualidade em Pernambuco.</p>
 
         <div class="services-grid">
             <div class="service-card">
-                <div class="service-icon">🗺️</div>
-                <h3>Otimização de Rotas</h3>
-                <p>Algoritmo integrado ao Google Maps para calcular a rota mais eficiente entre múltiplos pontos de entrega.</p>
-            </div>
-            <div class="service-card">
                 <div class="service-icon">📦</div>
-                <h3>Rastreamento pelo Cliente</h3>
-                <p>O cliente acompanha sua entrega em tempo real pelo telefone, sabendo quando ela está próxima.</p>
+                <h3>Entrega de Encomendas</h3>
+                <p>Transportamos seus pacotes com cuidado e responsabilidade, garantindo que cheguem no prazo combinado e em perfeito estado.</p>
             </div>
             <div class="service-card">
-                <div class="service-icon">🚗</div>
-                <h3>App do Motorista</h3>
-                <p>Interface mobile para o motorista visualizar roteiro, confirmar entregas e registrar forma de pagamento.</p>
+                <div class="service-icon">🗺️</div>
+                <h3>Cobertura em Pernambuco</h3>
+                <p>Atendemos Recife e as principais cidades do interior: Caruaru, Petrolina, Garanhuns, Palmares, Vitória de Santo Antão e região.</p>
             </div>
             <div class="service-card">
-                <div class="service-icon">📊</div>
-                <h3>Gestão Completa</h3>
-                <p>Controle de pedidos, clientes, fornecedores, motoristas e viagens em um painel administrativo completo.</p>
-            </div>
-            <div class="service-card">
-                <div class="service-icon">🏆</div>
-                <h3>Ranking de Desempenho</h3>
-                <p>Acompanhe o desempenho dos motoristas com relatórios e ranking de entregas realizadas.</p>
+                <div class="service-icon">📍</div>
+                <h3>Rastreamento em Tempo Real</h3>
+                <p>Acompanhe sua encomenda pelo celular e saiba exatamente quando o entregador está chegando na sua porta.</p>
             </div>
             <div class="service-card">
                 <div class="service-icon">✅</div>
-                <h3>Validação de Fornecedor</h3>
-                <p>Controle o recebimento de pacotes dos fornecedores com confirmação digital e histórico completo.</p>
+                <h3>Controle de Entrega</h3>
+                <p>Registramos cada entrega com confirmação digital, data, hora e forma de pagamento — total transparência para você e para seu negócio.</p>
+            </div>
+            <div class="service-card">
+                <div class="service-icon">💳</div>
+                <h3>Flexibilidade no Pagamento</h3>
+                <p>Aceitamos diversas formas de pagamento na entrega: dinheiro, PIX e outros — com praticidade para o cliente final.</p>
+            </div>
+            <div class="service-card">
+                <div class="service-icon">🤝</div>
+                <h3>Parceria com Empresas</h3>
+                <p>Atendemos lojas, distribuidores e e-commerces que precisam de uma solução confiável para a última milha das suas entregas.</p>
             </div>
         </div>
     </div>
 </section>
 
-<!-- Como funciona -->
-<section id="como-funciona">
+<!-- Cidades -->
+<section id="cidades" style="background:#fff; padding: 70px 20px;">
     <div class="container">
-        <div class="section-tag">Como funciona</div>
-        <h2>Simples e eficiente</h2>
-        <p class="section-sub">Do cadastro à entrega em poucos passos.</p>
+        <div class="section-tag">Área de Atuação</div>
+        <h2>Onde entregamos</h2>
+        <p class="section-sub">Cobertura nas principais cidades de Pernambuco.</p>
 
-        <div class="steps">
-            <div class="step">
-                <div class="step-num">1</div>
-                <div class="step-body">
-                    <h3>Cadastre os pedidos e monte a viagem</h3>
-                    <p>Registre os pedidos, associe ao motorista e organize a viagem com todos os pontos de entrega.</p>
-                </div>
-            </div>
-            <div class="step">
-                <div class="step-num">2</div>
-                <div class="step-body">
-                    <h3>Gere a rota otimizada</h3>
-                    <p>O sistema calcula automaticamente a melhor sequência de entregas via Google Maps, economizando tempo e combustível.</p>
-                </div>
-            </div>
-            <div class="step">
-                <div class="step-num">3</div>
-                <div class="step-body">
-                    <h3>Motorista executa pelo app</h3>
-                    <p>O motorista acessa o roteiro pelo celular, confirma cada entrega e registra a forma de pagamento recebida.</p>
-                </div>
-            </div>
-            <div class="step">
-                <div class="step-num">4</div>
-                <div class="step-body">
-                    <h3>Cliente acompanha em tempo real</h3>
-                    <p>O cliente consulta o status da entrega pelo telefone e recebe aviso quando o entregador está próximo.</p>
-                </div>
-            </div>
+        <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:10px;">
+            <?php
+            $cidades = [
+                'Recife','Olinda','Caruaru','Petrolina','Garanhuns',
+                'Palmares','Vitória de Santo Antão','Cabo de Santo Agostinho',
+                'Paulista','Camaragibe','Jaboatão dos Guararapes','São Lourenço da Mata',
+                'Igarassu','Abreu e Lima','Gravatá','Bezerros',
+            ];
+            foreach ($cidades as $cidade): ?>
+                <span style="
+                    background: var(--gray);
+                    border: 1px solid #e0e0e0;
+                    padding: 8px 18px;
+                    border-radius: 30px;
+                    font-size: 0.88rem;
+                    color: #444;
+                    display:flex; align-items:center; gap:6px;
+                ">📍 <?php echo $cidade; ?></span>
+            <?php endforeach; ?>
+            <span style="
+                background: linear-gradient(135deg, var(--primary), var(--primary-d));
+                padding: 8px 18px; border-radius: 30px;
+                font-size: 0.88rem; color: #fff; font-weight:600;
+            ">+ outras regiões</span>
         </div>
     </div>
 </section>
