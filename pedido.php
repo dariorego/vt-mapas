@@ -20,7 +20,21 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
         $allowedCols = ['remessa_id','data_viagem','cliente_nome','remessa_pacote_qde','remessa_total','remessa_situacao_descricao','remessa_ordem'];
         if (!in_array($sortCol, $allowedCols)) $sortCol = 'remessa_id';
 
+        $limit  = max(1, min(200, (int) ($_GET['limit']  ?? 25)));
+        $offset = max(0, (int) ($_GET['offset'] ?? 0));
+
         $params = [];
+        $where  = "FROM v_remessa WHERE remessa_cliente_id NOT IN (120,197)";
+
+        if (!empty($search)) {
+            $where .= " AND (cliente_nome LIKE :s1 OR CAST(remessa_id AS CHAR) LIKE :s2 OR motorista_nome LIKE :s3)";
+            $params[':s1'] = "%{$search}%";
+            $params[':s2'] = "%{$search}%";
+            $params[':s3'] = "%{$search}%";
+        }
+
+        $total = (int) $db->queryOne("SELECT COUNT(*) as n {$where}", $params)['n'];
+
         $sql = "SELECT remessa_id, remessa_descricao, remessa_pacote_qde, remessa_pacote_valor,
                 remessa_fardo_qde, remessa_fardo_valor, remessa_forma_pagamento_id,
                 remessa_cliente_id, remessa_remessa_situacao_id, remessa_motorista_id,
@@ -30,17 +44,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
                 forma_pgto_descricao, remessa_situacao_descricao,
                 viagem_id, data_viagem, cliente_cidade_id,
                 viagem_remessa_situacao_id, remessa_ordem
-                FROM v_remessa WHERE remessa_cliente_id NOT IN (120,197)";
-
-        if (!empty($search)) {
-            $sql .= " AND (cliente_nome LIKE :s1 OR CAST(remessa_id AS CHAR) LIKE :s2 OR motorista_nome LIKE :s3)";
-            $params[':s1'] = "%{$search}%";
-            $params[':s2'] = "%{$search}%";
-            $params[':s3'] = "%{$search}%";
-        }
-        $sql .= " ORDER BY {$sortCol} {$sortDir} LIMIT 200";
+                {$where} ORDER BY {$sortCol} {$sortDir} LIMIT {$limit} OFFSET {$offset}";
         $pedidos = $db->query($sql, $params);
-        echo json_encode(['success' => true, 'data' => $pedidos]);
+        echo json_encode(['success' => true, 'data' => $pedidos, 'total' => $total]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
@@ -372,6 +378,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             </div>
             <div class="filter-bar">
                 <input type="text" id="searchInput" placeholder="🔍 Buscar por cliente, código ou motorista..." oninput="debounceSearch()">
+                <select id="pageSizeSelect" onchange="onPageSizeChange()" style="padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:0.9rem;">
+                    <option value="10">10 / pág</option>
+                    <option value="25" selected>25 / pág</option>
+                    <option value="50">50 / pág</option>
+                    <option value="100">100 / pág</option>
+                </select>
                 <button class="btn btn-secondary" onclick="loadPedidos()">🔄 Atualizar</button>
             </div>
             <div class="table-container">
@@ -387,6 +399,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                     </tr></thead>
                     <tbody id="tableBody"><tr><td colspan="7" class="loading">🔄 Carregando...</td></tr></tbody>
                 </table>
+            </div>
+            <div id="paginationBar" style="display:none; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:12px 4px;">
+                <span id="paginationInfo" style="font-size:0.85rem; color:#666;"></span>
+                <div id="paginationControls" style="display:flex; gap:4px; flex-wrap:wrap;"></div>
             </div>
         </div>
 
@@ -485,7 +501,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     let currentSort = 'remessa_id', currentDir = 'DESC', searchTimeout = null, deleteId = null;
     let viagensCache=[], motoristasCache=[], situacoesCache=[], formasPgtoCache=[];
 
-    document.addEventListener('DOMContentLoaded', () => { loadPedidos(); loadFormData(); });
+    // ── Paginação ─────────────────────────────────────────────────────────────
+    let currentPage = 1, pageSize = 25, totalItems = 0;
+    function readUrlParams() {
+        const p = new URLSearchParams(location.search);
+        currentPage = Math.max(1, parseInt(p.get('page') || '1'));
+        pageSize    = [10,25,50,100].includes(parseInt(p.get('size'))) ? parseInt(p.get('size')) : 25;
+        const sel = document.getElementById('pageSizeSelect');
+        if (sel) sel.value = pageSize;
+    }
+    function syncUrl() {
+        const p = new URLSearchParams(location.search);
+        p.set('page', currentPage); p.set('size', pageSize);
+        history.replaceState(null, '', '?' + p.toString());
+    }
+    function renderPagination() {
+        const bar = document.getElementById('paginationBar');
+        const info = document.getElementById('paginationInfo');
+        const ctrl = document.getElementById('paginationControls');
+        if (!totalItems) { bar.style.display = 'none'; return; }
+        const totalPages = Math.ceil(totalItems / pageSize);
+        const from = Math.min((currentPage-1)*pageSize+1, totalItems);
+        const to   = Math.min(currentPage*pageSize, totalItems);
+        bar.style.display = 'flex';
+        info.textContent  = `${from}–${to} de ${totalItems} registros`;
+        const bs = (active) => `style="padding:6px 10px;border:1px solid ${active?'#1F6F54':'#ddd'};border-radius:6px;background:${active?'#1F6F54':'#fff'};color:${active?'#fff':'#333'};font-size:0.82rem;cursor:pointer;font-weight:${active?'700':'400'};"`;
+        let btns = `<button ${bs(false)} onclick="goPage(1)" ${currentPage===1?'disabled':''}>«</button>`;
+        btns    += `<button ${bs(false)} onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
+        for (let i=Math.max(1,currentPage-2); i<=Math.min(totalPages,currentPage+2); i++)
+            btns += `<button ${bs(i===currentPage)} onclick="goPage(${i})">${i}</button>`;
+        btns += `<button ${bs(false)} onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>`;
+        btns += `<button ${bs(false)} onclick="goPage(${totalPages})" ${currentPage===totalPages?'disabled':''}>»</button>`;
+        ctrl.innerHTML = btns;
+    }
+    function goPage(p) {
+        const tp = Math.ceil(totalItems/pageSize);
+        p = Math.max(1, Math.min(tp, p));
+        if (p === currentPage) return;
+        currentPage = p; syncUrl(); loadPedidos();
+    }
+    function onPageSizeChange() {
+        pageSize = parseInt(document.getElementById('pageSizeSelect').value);
+        currentPage = 1; syncUrl(); loadPedidos();
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    document.addEventListener('DOMContentLoaded', () => { readUrlParams(); loadPedidos(); loadFormData(); });
     document.addEventListener('click', e => { if (!e.target.closest('.form-group')) document.getElementById('clienteResults').classList.remove('active'); });
 
     async function loadFormData() {
@@ -559,14 +620,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
 
     async function loadPedidos() {
         const search = document.getElementById('searchInput').value;
-        const tbody = document.getElementById('tableBody');
+        const tbody  = document.getElementById('tableBody');
         tbody.innerHTML = '<tr><td colspan="7" class="loading">🔄 Carregando...</td></tr>';
+        const offset = (currentPage - 1) * pageSize;
         try {
-            const url = `pedido.php?ajax=list&search=${encodeURIComponent(search)}&sort=${currentSort}&dir=${currentDir}`;
-            const res = await fetch(url);
+            const url = `pedido.php?ajax=list&search=${encodeURIComponent(search)}&sort=${currentSort}&dir=${currentDir}&limit=${pageSize}&offset=${offset}`;
+            const res  = await fetch(url);
             const data = await res.json();
             if (!data.success) throw new Error(data.error);
-            if (data.data.length === 0) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">📦</div><p>Nenhum pedido encontrado</p></div></td></tr>'; return; }
+
+            totalItems = data.total;
+            renderPagination();
+            syncUrl();
+
+            if (!data.data.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">📦</div><p>Nenhum pedido encontrado</p></div></td></tr>'; return; }
             tbody.innerHTML = data.data.map(p => `<tr>
                 <td><strong>${p.remessa_id}</strong></td>
                 <td><strong>${esc(p.cliente_nome)}</strong><br><span style="font-size:0.8rem;color:var(--text-muted)">${esc(p.cliente_endereco||'')}</span></td>
@@ -583,9 +650,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         } catch(e) { tbody.innerHTML = '<tr><td colspan="7" class="empty-state">❌ Erro ao carregar</td></tr>'; showToast(e.message,'error'); }
     }
 
-    function sortBy(col) { if(currentSort===col) currentDir=currentDir==='ASC'?'DESC':'ASC'; else { currentSort=col; currentDir='DESC'; } loadPedidos(); }
+    function sortBy(col) { if(currentSort===col) currentDir=currentDir==='ASC'?'DESC':'ASC'; else { currentSort=col; currentDir='DESC'; } currentPage=1; loadPedidos(); }
     function updateSortHeaders() { document.querySelectorAll('th[data-sort]').forEach(th => { th.classList.remove('sorted'); const i=th.querySelector('.sort-icon'); if(i) i.textContent='↕'; }); const a=document.querySelector(`th[data-sort="${currentSort}"]`); if(a){a.classList.add('sorted'); const i=a.querySelector('.sort-icon'); if(i) i.textContent=currentDir==='ASC'?'↑':'↓'; } }
-    function debounceSearch() { clearTimeout(searchTimeout); searchTimeout=setTimeout(loadPedidos,300); }
+    function debounceSearch() { clearTimeout(searchTimeout); searchTimeout=setTimeout(()=>{currentPage=1;loadPedidos();},300); }
 
     function showForm(id=null) {
         document.getElementById('gridView').classList.add('hidden');

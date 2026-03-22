@@ -81,8 +81,8 @@ $isRelatoriosPage = in_array($currentPage, ['ranking.php']);
     :root {
         --sidebar-width: 260px;
         --sidebar-collapsed-width: 72px;
-        --sidebar-bg-start: #2E9D6F;
-        --sidebar-bg-end: #248C5A;
+        --sidebar-bg-start: <?php echo EMPRESA_COR_PRIMARIA; ?>;
+        --sidebar-bg-end: <?php echo EMPRESA_COR_SECUNDARIA; ?>;
         --sidebar-transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
@@ -602,10 +602,15 @@ $isRelatoriosPage = in_array($currentPage, ['ranking.php']);
     </button>
 
     <div class="sidebar-header">
-        <span class="sidebar-logo">🚚</span>
+        <?php if (EMPRESA_LOGO): ?>
+            <img src="<?php echo htmlspecialchars(EMPRESA_LOGO); ?>" alt="Logo"
+                 style="width:40px;height:40px;object-fit:contain;border-radius:6px;flex-shrink:0;">
+        <?php else: ?>
+            <span class="sidebar-logo">🚚</span>
+        <?php endif; ?>
         <div class="sidebar-brand">
-            <h1>Victor Transportes</h1>
-            <p>Sistema de Gestão</p>
+            <h1><?php echo htmlspecialchars(EMPRESA_NOME); ?></h1>
+            <p><?php echo htmlspecialchars(EMPRESA_SLOGAN); ?></p>
         </div>
     </div>
 
@@ -742,7 +747,7 @@ $isRelatoriosPage = in_array($currentPage, ['ranking.php']);
     </div>
 
     <div class="sidebar-footer">
-        © 2026 Victor Transportes
+        © <?php echo date('Y'); ?> <?php echo htmlspecialchars(EMPRESA_NOME); ?>
     </div>
 </aside>
 

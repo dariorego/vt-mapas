@@ -54,15 +54,23 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'pontos') {
             ];
         }
 
+        // Busca polyline salva da viagem (se já foi otimizada com Google)
+        $polylineEncoded = null;
+        if ($hasOrder) {
+            $viagemRow = $db->queryOne("SELECT polyline_encoded FROM viagem WHERE id = ?", [$viagemId]);
+            $polylineEncoded = $viagemRow['polyline_encoded'] ?? null;
+        }
+
         echo json_encode([
-            'success' => true,
-            'startPoint' => $startPoint,
-            'points' => $points,
-            'driverPoint' => $driverPoint,
-            'motorista' => $motorista,
-            'data' => $dataRemessa,
-            'total' => count($points),
-            'hasOrder' => $hasOrder
+            'success'         => true,
+            'startPoint'      => $startPoint,
+            'points'          => $points,
+            'driverPoint'     => $driverPoint,
+            'motorista'       => $motorista,
+            'data'            => $dataRemessa,
+            'total'           => count($points),
+            'hasOrder'        => $hasOrder,
+            'encodedPolyline' => $polylineEncoded,
         ]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -93,13 +101,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['optimize'])) {
         }
 
         echo json_encode([
-            'success' => true,
-            'startPoint' => $startPoint,
-            'route' => $route,
-            'driverPoint' => $driverPoint,
-            'motorista' => $firstPoint['motorista_nome'] ?? 'Não definido',
-            'totalDistance' => $optimizer->getTotalDistance(),
-            'estimatedTime' => $optimizer->getEstimatedTime()
+            'success'         => true,
+            'startPoint'      => $startPoint,
+            'route'           => $route,
+            'driverPoint'     => $driverPoint,
+            'motorista'       => $firstPoint['motorista_nome'] ?? 'Não definido',
+            'totalDistance'   => $optimizer->getTotalDistance(),
+            'estimatedTime'   => $optimizer->getEstimatedTime(),
+            'encodedPolyline' => $optimizer->getEncodedPolyline(),
         ]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -441,6 +450,7 @@ $currentPage = 'gerarrota.php';
                 <button type="button" id="btnCarregarRota" disabled>🗺️ Gerar Rota</button>
                 <button type="button" id="btnValidarRota" class="btn-secondary" disabled>✅ Validar Rota</button>
                 <button type="button" id="btnFitBounds" class="btn-secondary" style="background-color: #17a2b8;" disabled>🎯 Enquadrar</button>
+                <button type="button" id="btnGoogleMaps" class="btn-secondary" style="background-color: #4285F4; color: #fff;" disabled onclick="openGoogleMaps()">📍 Abrir no Google Maps</button>
             </form>
         </div>
 
@@ -471,6 +481,24 @@ $currentPage = 'gerarrota.php';
     </div>
 
     <script>
+        // ── Decoder de Google Encoded Polyline ───────────────────────────────────
+        // Converte a string encodada do Google em array [[lat, lng], ...]
+        function decodePolyline(encoded) {
+            const result = [];
+            let index = 0, lat = 0, lng = 0;
+            while (index < encoded.length) {
+                let b, shift = 0, result2 = 0;
+                do { b = encoded.charCodeAt(index++) - 63; result2 |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+                lat += (result2 & 1) ? ~(result2 >> 1) : (result2 >> 1);
+                shift = 0; result2 = 0;
+                do { b = encoded.charCodeAt(index++) - 63; result2 |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+                lng += (result2 & 1) ? ~(result2 >> 1) : (result2 >> 1);
+                result.push([lat / 1e5, lng / 1e5]);
+            }
+            return result;
+        }
+        // ─────────────────────────────────────────────────────────────────────────
+
         // Estado global
         let map;
         let markers = []; // Marcadores de clientes + start
@@ -482,6 +510,7 @@ $currentPage = 'gerarrota.php';
         let isRouteOptimized = false;
         let currentViagemId = null;
         let currentRouteLatLngs = []; // Armazena a rota de entregas (Start + Clientes)
+        let currentEncodedPolyline = null; // Polyline encodada retornada pelo Google
 
         // Inicializa mapa
         function initMap() {
@@ -504,8 +533,10 @@ $currentPage = 'gerarrota.php';
                 map.removeLayer(polyline);
                 polyline = null;
             }
-            currentRouteLatLngs = [];
+            currentRouteLatLngs    = [];
+            currentEncodedPolyline = null;
             document.getElementById('btnFitBounds').disabled = true;
+            document.getElementById('btnGoogleMaps').disabled = true;
         }
 
         // Função para enquadrar todos os elementos
@@ -560,30 +591,45 @@ $currentPage = 'gerarrota.php';
 
         // Atualiza a linha do mapa baseado nos checkboxes
         function updatePolyline() {
-            if (!currentRouteLatLngs || currentRouteLatLngs.length === 0) return;
-
-            if (polyline) {
-                map.removeLayer(polyline);
-            }
+            if (polyline) { map.removeLayer(polyline); polyline = null; }
 
             const hideStartLine = document.getElementById('toggleStartLine').checked;
-            const hideEndLine = document.getElementById('toggleEndLine').checked;
-            
-            // Copia os pontos da rota de entregas
+            const hideEndLine   = document.getElementById('toggleEndLine').checked;
+
+            // Se temos polyline do Google, usa o caminho real por ruas
+            if (currentEncodedPolyline) {
+                let roadCoords = decodePolyline(currentEncodedPolyline);
+
+                // Opcional: remove o trecho inicial (partida→1ª entrega) se toggleStartLine
+                // O polyline do Google já inclui todo o trajeto; para o toggle funcionar
+                // usamos a abordagem de recortar pelo 1º ponto de entrega
+                if (hideStartLine && currentRouteLatLngs.length > 1) {
+                    const firstDelivery = currentRouteLatLngs[1]; // [1] pois [0] é o startPoint
+                    const cutIdx = roadCoords.findIndex(
+                        c => Math.abs(c[0] - firstDelivery[0]) < 0.001 && Math.abs(c[1] - firstDelivery[1]) < 0.001
+                    );
+                    if (cutIdx > 0) roadCoords = roadCoords.slice(cutIdx);
+                }
+
+                if (!hideEndLine && driverPoint) {
+                    roadCoords.push([driverPoint.latitude, driverPoint.longitude]);
+                }
+
+                if (roadCoords.length > 0) {
+                    polyline = L.polyline(roadCoords, { color: '#2E9D6F', weight: 4, opacity: 0.85 }).addTo(map);
+                }
+                return;
+            }
+
+            // Fallback: linha reta entre os pontos (sem polyline do Google)
+            if (!currentRouteLatLngs || currentRouteLatLngs.length === 0) return;
+
             let pointsToDraw = [...currentRouteLatLngs];
-
-            // Se deve ocultar a linha de partida e temos pelo menos 2 pontos
-            if (hideStartLine && pointsToDraw.length > 1) {
-                pointsToDraw.shift(); 
-            }
-
-            // Se deve mostrar o retorno e temos driverPoint, adiciona ao final
-            if (!hideEndLine && driverPoint) {
-                pointsToDraw.push([driverPoint.latitude, driverPoint.longitude]);
-            }
+            if (hideStartLine && pointsToDraw.length > 1) pointsToDraw.shift();
+            if (!hideEndLine && driverPoint) pointsToDraw.push([driverPoint.latitude, driverPoint.longitude]);
 
             if (pointsToDraw.length > 0) {
-                polyline = L.polyline(pointsToDraw, { color: '#2E9D6F', weight: 4, opacity: 0.8 }).addTo(map);
+                polyline = L.polyline(pointsToDraw, { color: '#2E9D6F', weight: 4, opacity: 0.8, dashArray: '8 4' }).addTo(map);
             }
         }
 
@@ -669,10 +715,11 @@ $currentPage = 'gerarrota.php';
         // Mostra rota já existente no banco (ordem já definida)
         function showExistingRoute(data) {
             clearMap();
-            startPoint = data.startPoint;
-            driverPoint = data.driverPoint;
-            currentPoints = data.points;
-            isRouteOptimized = true;
+            startPoint             = data.startPoint;
+            driverPoint            = data.driverPoint;
+            currentPoints          = data.points;
+            isRouteOptimized       = true;
+            currentEncodedPolyline = data.encodedPolyline || null;
 
             // Marcador de partida
             const startMarker = L.marker([startPoint.latitude, startPoint.longitude], { icon: startIcon })
@@ -751,15 +798,17 @@ $currentPage = 'gerarrota.php';
             document.getElementById('btnCarregarRota').disabled = false;
             document.getElementById('btnValidarRota').disabled = false;
             document.getElementById('btnFitBounds').disabled = false;
+            document.getElementById('btnGoogleMaps').disabled = false;
         }
 
         // Mostra rota otimizada
         function showOptimizedRoute(data) {
             clearMap();
-            startPoint = data.startPoint;
-            driverPoint = data.driverPoint;
-            currentPoints = data.route;
-            isRouteOptimized = true;
+            startPoint             = data.startPoint;
+            driverPoint            = data.driverPoint;
+            currentPoints          = data.route;
+            isRouteOptimized       = true;
+            currentEncodedPolyline = data.encodedPolyline || null;
 
             // Marcador de partida
             const startMarker = L.marker([startPoint.latitude, startPoint.longitude], { icon: startIcon })
@@ -776,8 +825,9 @@ $currentPage = 'gerarrota.php';
                 const lon = parseFloat(point.longitude);
 
                 const icon = createNumberIcon(point.ordem);
+                const tempoLabel = point.tempo ? `${point.tempo} min` : '-';
                 let popup = `<b>${point.ordem}. ${point.cliente_nome || 'Cliente'}</b><br>`;
-                popup += `${point.situacao_descricao || ''}<br>Distância: ${point.distancia} km`;
+                popup += `${point.situacao_descricao || ''}<br>Distância: ${point.distancia} km | ${tempoLabel}`;
 
                 const marker = L.marker([lat, lon], { icon })
                     .addTo(map)
@@ -816,7 +866,7 @@ $currentPage = 'gerarrota.php';
                     <td class="seq-num"><strong style="color: var(--primary-color);">${point.ordem}</strong></td>
                     <td><strong>${point.cliente_nome || 'Cliente ' + point.cliente_id}</strong></td>
                     <td class="dist-cell">${point.distancia} km</td>
-                    <td class="time-cell">${Math.round((point.distancia / 40) * 60)} min</td>
+                    <td class="time-cell">${point.tempo ? point.tempo + ' min' : '-'}</td>
                     <td><span class="badge badge-info">${(point.situacao_descricao || 'PENDENTE').toUpperCase()}</span></td>
                 `;
                 tbody.appendChild(tr);
@@ -831,6 +881,7 @@ $currentPage = 'gerarrota.php';
                 onEnd: recalculateRoute
             });
             document.getElementById('btnFitBounds').disabled = false;
+            document.getElementById('btnGoogleMaps').disabled = false;
         }
 
         // Recalcula após drag-and-drop e salva no banco
@@ -906,6 +957,26 @@ $currentPage = 'gerarrota.php';
                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                 Math.sin(dLon / 2) * Math.sin(dLon / 2);
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+
+        function openGoogleMaps() {
+            if (!startPoint || !currentPoints || currentPoints.length === 0) return;
+
+            // Monta lista de paradas: origem → pontos na ordem → (motorista opcional)
+            const stops = [];
+            stops.push(`${startPoint.latitude},${startPoint.longitude}`);
+
+            const sorted = [...currentPoints].sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+            sorted.forEach(p => stops.push(`${p.latitude},${p.longitude}`));
+
+            const hideEnd = document.getElementById('toggleEndLine').checked;
+            if (!hideEnd && driverPoint) {
+                stops.push(`${driverPoint.latitude},${driverPoint.longitude}`);
+            }
+
+            // Formato /dir/ suporta qualquer número de paradas
+            const url = 'https://www.google.com/maps/dir/' + stops.join('/');
+            window.open(url, '_blank');
         }
 
         function showAlert(message, type = 'info') {

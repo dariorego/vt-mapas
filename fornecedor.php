@@ -20,21 +20,33 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
         $allowedCols = ['id', 'descricao', 'contato_nome', 'contato_fone', 'situacao', 'endereco'];
         if (!in_array($sortCol, $allowedCols)) $sortCol = 'descricao';
 
+        $limit    = max(1, min(200, (int) ($_GET['limit']    ?? 25)));
+        $offset   = max(0, (int) ($_GET['offset']   ?? 0));
+        $situacao = $_GET['situacao'] ?? '';
+
         $params = [];
-        $sql = "SELECT id, descricao, contato_nome, contato_fone, situacao, endereco
-                FROM prod_vt.fornecedor WHERE 1=1";
+        $where  = "FROM prod_vt.fornecedor WHERE 1=1";
 
         if (!empty($search)) {
-            $sql .= " AND (descricao LIKE :s1 OR contato_nome LIKE :s2 OR contato_fone LIKE :s3 OR endereco LIKE :s4 OR CAST(id AS CHAR) LIKE :s5)";
+            $where .= " AND (descricao LIKE :s1 OR contato_nome LIKE :s2 OR contato_fone LIKE :s3 OR endereco LIKE :s4 OR CAST(id AS CHAR) LIKE :s5)";
             $params[':s1'] = "%{$search}%";
             $params[':s2'] = "%{$search}%";
             $params[':s3'] = "%{$search}%";
             $params[':s4'] = "%{$search}%";
             $params[':s5'] = "%{$search}%";
         }
-        $sql .= " ORDER BY {$sortCol} {$sortDir}";
+        if (!empty($situacao)) {
+            $where .= " AND (situacao = :sit OR (situacao IS NULL AND :sit2 = 'Ativo'))";
+            $params[':sit']  = $situacao;
+            $params[':sit2'] = $situacao;
+        }
+
+        $total = (int) $db->queryOne("SELECT COUNT(*) as n {$where}", $params)['n'];
+
+        $sql = "SELECT id, descricao, contato_nome, contato_fone, situacao, endereco
+                {$where} ORDER BY {$sortCol} {$sortDir} LIMIT {$limit} OFFSET {$offset}";
         $fornecedores = $db->query($sql, $params);
-        echo json_encode(['success' => true, 'data' => $fornecedores]);
+        echo json_encode(['success' => true, 'data' => $fornecedores, 'total' => $total]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
@@ -244,10 +256,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             </div>
             <div class="filter-bar">
                 <input type="text" id="searchInput" placeholder="🔍 Busca Rápida..." oninput="debounceSearch()">
-                <select id="filterSituacao" onchange="loadFornecedores()">
+                <select id="filterSituacao" onchange="onFilterChange()">
                     <option value="">Todos</option>
                     <option value="Ativo" selected>Ativo</option>
                     <option value="Inativo">Inativo</option>
+                </select>
+                <select id="pageSizeSelect" onchange="onPageSizeChange()">
+                    <option value="10">10 / pág</option>
+                    <option value="25" selected>25 / pág</option>
+                    <option value="50">50 / pág</option>
+                    <option value="100">100 / pág</option>
                 </select>
                 <button class="btn btn-secondary" onclick="loadFornecedores()">🔄</button>
                 <span class="counter-badge" id="counterBadge">0 registros</span>
@@ -264,6 +282,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                     </tr></thead>
                     <tbody id="tableBody"><tr><td colspan="6" class="loading">🔄 Carregando...</td></tr></tbody>
                 </table>
+            </div>
+            <div id="paginationBar" style="display:none; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:12px 4px;">
+                <span id="paginationInfo" style="font-size:0.85rem; color:#666;"></span>
+                <div id="paginationControls" style="display:flex; gap:4px; flex-wrap:wrap;"></div>
             </div>
         </div>
 
@@ -338,7 +360,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     <script>
     let currentSort = 'descricao', currentDir = 'ASC', searchTimeout = null, deleteId = null;
 
-    document.addEventListener('DOMContentLoaded', () => { loadFornecedores(); setFormDate(); });
+    // ── Paginação ─────────────────────────────────────────────────────────────
+    let currentPage = 1, pageSize = 25, totalItems = 0;
+    function readUrlParams() {
+        const p = new URLSearchParams(location.search);
+        currentPage = Math.max(1, parseInt(p.get('page') || '1'));
+        pageSize    = [10,25,50,100].includes(parseInt(p.get('size'))) ? parseInt(p.get('size')) : 25;
+        const sel = document.getElementById('pageSizeSelect');
+        if (sel) sel.value = pageSize;
+    }
+    function syncUrl() {
+        const p = new URLSearchParams(location.search);
+        p.set('page', currentPage); p.set('size', pageSize);
+        history.replaceState(null, '', '?' + p.toString());
+    }
+    function renderPagination() {
+        const bar = document.getElementById('paginationBar');
+        const info = document.getElementById('paginationInfo');
+        const ctrl = document.getElementById('paginationControls');
+        if (!totalItems) { bar.style.display = 'none'; return; }
+        const totalPages = Math.ceil(totalItems / pageSize);
+        const from = Math.min((currentPage-1)*pageSize+1, totalItems);
+        const to   = Math.min(currentPage*pageSize, totalItems);
+        bar.style.display = 'flex';
+        info.textContent  = `${from}–${to} de ${totalItems} registros`;
+        const bs = (active) => `style="padding:6px 10px;border:1px solid ${active?'#1F6F54':'#ddd'};border-radius:6px;background:${active?'#1F6F54':'#fff'};color:${active?'#fff':'#333'};font-size:0.82rem;cursor:pointer;font-weight:${active?'700':'400'};"`;
+        let btns = `<button ${bs(false)} onclick="goPage(1)" ${currentPage===1?'disabled':''}>«</button>`;
+        btns    += `<button ${bs(false)} onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
+        for (let i=Math.max(1,currentPage-2); i<=Math.min(totalPages,currentPage+2); i++)
+            btns += `<button ${bs(i===currentPage)} onclick="goPage(${i})">${i}</button>`;
+        btns += `<button ${bs(false)} onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>`;
+        btns += `<button ${bs(false)} onclick="goPage(${totalPages})" ${currentPage===totalPages?'disabled':''}>»</button>`;
+        ctrl.innerHTML = btns;
+    }
+    function goPage(p) {
+        const tp = Math.ceil(totalItems/pageSize);
+        p = Math.max(1, Math.min(tp, p));
+        if (p === currentPage) return;
+        currentPage = p; syncUrl(); loadFornecedores();
+    }
+    function onPageSizeChange() {
+        pageSize = parseInt(document.getElementById('pageSizeSelect').value);
+        currentPage = 1; syncUrl(); loadFornecedores();
+    }
+    function onFilterChange() { currentPage = 1; loadFornecedores(); }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    document.addEventListener('DOMContentLoaded', () => { readUrlParams(); loadFornecedores(); setFormDate(); });
 
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') closeDeleteModal();
@@ -351,43 +419,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     }
 
     async function loadFornecedores() {
-        const search = document.getElementById('searchInput').value;
+        const search    = document.getElementById('searchInput').value;
         const sitFilter = document.getElementById('filterSituacao').value;
-        const tbody = document.getElementById('tableBody');
-        tbody.innerHTML = '<tr><td colspan="7" class="loading">🔄 Carregando...</td></tr>';
+        const tbody     = document.getElementById('tableBody');
+        tbody.innerHTML = '<tr><td colspan="6" class="loading">🔄 Carregando...</td></tr>';
+        const offset = (currentPage - 1) * pageSize;
         try {
-            const url = `fornecedor.php?ajax=list&search=${encodeURIComponent(search)}&sort=${currentSort}&dir=${currentDir}`;
-            const res = await fetch(url);
+            const url = `fornecedor.php?ajax=list&search=${encodeURIComponent(search)}&sort=${currentSort}&dir=${currentDir}&situacao=${encodeURIComponent(sitFilter)}&limit=${pageSize}&offset=${offset}`;
+            const res  = await fetch(url);
             const data = await res.json();
             if (!data.success) throw new Error(data.error);
 
-            // Normalize situacao and filter
-            let filtered = data.data.map(f => {
-                let sit = (f.situacao || '').toLowerCase();
-                if (sit === 'a' || sit === 'ativo' || sit === '') f._sitNorm = 'Ativo';
-                else if (sit === 'i' || sit === 'inativo') f._sitNorm = 'Inativo';
-                else f._sitNorm = f.situacao || 'Ativo';
-                return f;
-            });
-            if (sitFilter) {
-                filtered = filtered.filter(f => f._sitNorm === sitFilter);
-            }
+            totalItems = data.total;
+            document.getElementById('counterBadge').textContent = `${totalItems} registros`;
+            renderPagination();
+            syncUrl();
 
-            document.getElementById('counterBadge').textContent = `${filtered.length} registros`;
-
-            if (filtered.length === 0) {
+            if (!data.data.length) {
                 tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">🏭</div><p>Nenhum fornecedor encontrado</p></div></td></tr>';
                 return;
             }
 
-            tbody.innerHTML = filtered.map((f, i) => {
-                const isAtivo = f._sitNorm === 'Ativo';
+            tbody.innerHTML = data.data.map((f) => {
+                let sit = (f.situacao || '').toLowerCase();
+                const isAtivo = sit === 'a' || sit === 'ativo' || sit === '';
                 return `<tr>
                     <td>${f.id}</td>
                     <td><strong>${esc(f.descricao || '')}</strong></td>
                     <td>${esc(f.contato_nome || '')}</td>
                     <td>${esc(f.contato_fone || '')}</td>
-                    <td><span class="badge ${isAtivo ? 'badge-success' : 'badge-danger'}">${f._sitNorm}</span></td>
+                    <td><span class="badge ${isAtivo ? 'badge-success' : 'badge-danger'}">${isAtivo ? 'Ativo' : 'Inativo'}</span></td>
                     <td class="actions" style="justify-content:center">
                         <button class="action-btn edit" onclick="editFornecedor(${f.id})" title="Editar">✏️</button>
                         <button class="action-btn delete" onclick="openDeleteModal(${f.id}, '${esc(f.descricao || '')}')" title="Inativar">🗑️</button>
@@ -404,6 +465,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     function sortBy(col) {
         if(currentSort===col) currentDir=currentDir==='ASC'?'DESC':'ASC';
         else { currentSort=col; currentDir='ASC'; }
+        currentPage = 1;
         loadFornecedores();
     }
     function updateSortHeaders() {
@@ -415,7 +477,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         const a=document.querySelector(`th[data-sort="${currentSort}"]`);
         if(a){ a.classList.add('sorted'); const i=a.querySelector('.sort-icon'); if(i) i.textContent=currentDir==='ASC'?'↑':'↓'; }
     }
-    function debounceSearch() { clearTimeout(searchTimeout); searchTimeout=setTimeout(loadFornecedores,300); }
+    function debounceSearch() { clearTimeout(searchTimeout); searchTimeout=setTimeout(()=>{currentPage=1;loadFornecedores();},300); }
 
     // ===== FORM FUNCTIONS =====
     function showForm(id=null) {

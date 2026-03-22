@@ -29,19 +29,24 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
         if (!in_array($sortCol, $allowedCols))
             $sortCol = 'nome';
 
+        $limit  = max(1, min(200, (int) ($_GET['limit']  ?? 25)));
+        $offset = max(0, (int) ($_GET['offset'] ?? 0));
+
         $params = [];
-        $sql = "SELECT id, nome, situacao, fone, carro_id, usuario, latitude, longitude 
-                FROM prod_vt.motorista WHERE 1=1";
+        $where  = "FROM prod_vt.motorista WHERE 1=1";
 
         if (!empty($search)) {
-            $sql .= " AND nome LIKE :search";
+            $where .= " AND nome LIKE :search";
             $params[':search'] = "%{$search}%";
         }
 
-        $sql .= " ORDER BY {$sortCol} {$sortDir}";
+        $total = (int) $db->queryOne("SELECT COUNT(*) as n {$where}", $params)['n'];
+
+        $sql = "SELECT id, nome, situacao, fone, carro_id, usuario, latitude, longitude
+                {$where} ORDER BY {$sortCol} {$sortDir} LIMIT {$limit} OFFSET {$offset}";
 
         $motoristas = $db->query($sql, $params);
-        echo json_encode(['success' => true, 'data' => $motoristas]);
+        echo json_encode(['success' => true, 'data' => $motoristas, 'total' => $total]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
@@ -603,6 +608,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
 
         <div class="filter-bar">
             <input type="text" id="searchInput" placeholder="🔍 Buscar por nome..." oninput="debounceSearch()">
+            <select id="pageSizeSelect" onchange="onPageSizeChange()" style="padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:0.9rem;">
+                <option value="10">10 / pág</option>
+                <option value="25" selected>25 / pág</option>
+                <option value="50">50 / pág</option>
+                <option value="100">100 / pág</option>
+            </select>
             <button class="btn btn-secondary" onclick="loadMotoristas()">🔄 Atualizar</button>
         </div>
 
@@ -634,6 +645,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                     </tr>
                 </tbody>
             </table>
+        </div>
+        <div id="paginationBar" style="display:none; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:12px 4px;">
+            <span id="paginationInfo" style="font-size:0.85rem; color:#666;"></span>
+            <div id="paginationControls" style="display:flex; gap:4px; flex-wrap:wrap;"></div>
         </div>
     </main>
 
@@ -736,28 +751,100 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     <script>
         // Estado
         let currentSort = 'nome';
-        let currentDir = 'ASC';
+        let currentDir  = 'ASC';
         let searchTimeout = null;
         let deleteId = null;
         let mapInstance = null;
 
-        // Carrega dados na inicialização
-        document.addEventListener('DOMContentLoaded', loadMotoristas);
+        // ── Paginação ─────────────────────────────────────────────────────────
+        let currentPage = 1;
+        let pageSize    = 25;
+        let totalItems  = 0;
 
-        // Carregar motoristas
+        function readUrlParams() {
+            const p = new URLSearchParams(location.search);
+            currentPage = Math.max(1, parseInt(p.get('page') || '1'));
+            pageSize    = [10, 25, 50, 100].includes(parseInt(p.get('size'))) ? parseInt(p.get('size')) : 25;
+            const sel = document.getElementById('pageSizeSelect');
+            if (sel) sel.value = pageSize;
+        }
+
+        function syncUrl() {
+            const p = new URLSearchParams(location.search);
+            p.set('page', currentPage);
+            p.set('size', pageSize);
+            history.replaceState(null, '', '?' + p.toString());
+        }
+
+        function renderPagination() {
+            const bar  = document.getElementById('paginationBar');
+            const info = document.getElementById('paginationInfo');
+            const ctrl = document.getElementById('paginationControls');
+            if (!totalItems) { bar.style.display = 'none'; return; }
+
+            const totalPages = Math.ceil(totalItems / pageSize);
+            const from = Math.min((currentPage - 1) * pageSize + 1, totalItems);
+            const to   = Math.min(currentPage * pageSize, totalItems);
+
+            bar.style.display  = 'flex';
+            info.textContent   = `${from}–${to} de ${totalItems} registros`;
+
+            const btnStyle = (active) =>
+                `style="padding:6px 10px;border:1px solid ${active ? '#1F6F54' : '#ddd'};border-radius:6px;` +
+                `background:${active ? '#1F6F54' : '#fff'};color:${active ? '#fff' : '#333'};` +
+                `font-size:0.82rem;cursor:pointer;font-weight:${active ? '700' : '400'};"`;
+
+            let btns = `<button ${btnStyle(false)} onclick="goPage(1)" ${currentPage===1?'disabled':''}>«</button>`;
+            btns    += `<button ${btnStyle(false)} onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
+
+            const range = 2;
+            for (let i = Math.max(1, currentPage - range); i <= Math.min(totalPages, currentPage + range); i++) {
+                btns += `<button ${btnStyle(i===currentPage)} onclick="goPage(${i})">${i}</button>`;
+            }
+
+            btns += `<button ${btnStyle(false)} onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>`;
+            btns += `<button ${btnStyle(false)} onclick="goPage(${totalPages})" ${currentPage===totalPages?'disabled':''}>»</button>`;
+            ctrl.innerHTML = btns;
+        }
+
+        function goPage(p) {
+            const totalPages = Math.ceil(totalItems / pageSize);
+            p = Math.max(1, Math.min(totalPages, p));
+            if (p === currentPage) return;
+            currentPage = p;
+            syncUrl();
+            loadMotoristas();
+        }
+
+        function onPageSizeChange() {
+            pageSize    = parseInt(document.getElementById('pageSizeSelect').value);
+            currentPage = 1;
+            syncUrl();
+            loadMotoristas();
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+
+        document.addEventListener('DOMContentLoaded', () => { readUrlParams(); loadMotoristas(); });
+
         async function loadMotoristas() {
             const search = document.getElementById('searchInput').value;
-            const tbody = document.getElementById('tableBody');
+            const tbody  = document.getElementById('tableBody');
             tbody.innerHTML = '<tr><td colspan="6" class="loading">🔄 Carregando...</td></tr>';
 
+            const offset = (currentPage - 1) * pageSize;
             try {
-                const url = `motorista.php?ajax=list&search=${encodeURIComponent(search)}&sort=${currentSort}&dir=${currentDir}`;
-                const res = await fetch(url);
+                const url = `motorista.php?ajax=list&search=${encodeURIComponent(search)}&sort=${currentSort}&dir=${currentDir}&limit=${pageSize}&offset=${offset}`;
+                const res  = await fetch(url);
                 const data = await res.json();
 
                 if (!data.success) throw new Error(data.error);
 
-                if (data.data.length === 0) {
+                totalItems = data.total;
+                renderPagination();
+                syncUrl();
+
+                if (!data.data.length) {
                     tbody.innerHTML = `
                         <tr><td colspan="6">
                             <div class="empty-state">
@@ -781,8 +868,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                         </td>
                         <td>
                             <div class="actions">
-                                <button class="action-btn map ${m.latitude && m.longitude ? '' : 'disabled'}" 
-                                    onclick="${m.latitude && m.longitude ? `openMapModal(${m.latitude}, ${m.longitude}, '${escapeHtml(m.nome)}')` : 'void(0)'}" 
+                                <button class="action-btn map ${m.latitude && m.longitude ? '' : 'disabled'}"
+                                    onclick="${m.latitude && m.longitude ? `openMapModal(${m.latitude}, ${m.longitude}, '${escapeHtml(m.nome)}')` : 'void(0)'}"
                                     title="${m.latitude && m.longitude ? 'Ver no mapa' : 'Sem localização'}">🗺️</button>
                                 <button class="action-btn edit" onclick="editMotorista(${m.id})" title="Editar">✏️</button>
                                 <button class="action-btn delete" onclick="openDeleteModal(${m.id}, '${escapeHtml(m.nome)}')" title="Inativar">🗑️</button>
@@ -798,14 +885,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             }
         }
 
-        // Ordenação
         function sortBy(col) {
             if (currentSort === col) {
                 currentDir = currentDir === 'ASC' ? 'DESC' : 'ASC';
             } else {
                 currentSort = col;
-                currentDir = 'ASC';
+                currentDir  = 'ASC';
             }
+            currentPage = 1;
             loadMotoristas();
         }
 
@@ -822,10 +909,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             }
         }
 
-        // Debounce search
         function debounceSearch() {
             clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(loadMotoristas, 300);
+            searchTimeout = setTimeout(() => { currentPage = 1; loadMotoristas(); }, 300);
         }
 
         // Modal

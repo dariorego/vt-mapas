@@ -20,24 +20,32 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
         $allowedCols = ['id', 'nome', 'fone', 'endereco', 'situacao'];
         if (!in_array($sortCol, $allowedCols)) $sortCol = 'nome';
 
+        $limit    = max(1, min(200, (int) ($_GET['limit']    ?? 25)));
+        $offset   = max(0, (int) ($_GET['offset']   ?? 0));
+        $situacao = $_GET['situacao'] ?? '';
+
         $params = [];
-        $sql = "SELECT c.id, c.nome, c.fone, c.endereco, c.coordenadas, c.situacao, c.cidade_id,
-                       c.complemento, c.latitude, c.longitude,
-                       ci.descricao as cidade_descricao
-                FROM cliente c
-                LEFT JOIN cidade ci ON ci.id = c.cidade_id
-                WHERE 1=1";
+        $where  = "FROM cliente c LEFT JOIN cidade ci ON ci.id = c.cidade_id WHERE 1=1";
 
         if (!empty($search)) {
-            $sql .= " AND (c.nome LIKE :s1 OR c.fone LIKE :s2 OR c.endereco LIKE :s3 OR CAST(c.id AS CHAR) LIKE :s4)";
+            $where .= " AND (c.nome LIKE :s1 OR c.fone LIKE :s2 OR c.endereco LIKE :s3 OR CAST(c.id AS CHAR) LIKE :s4)";
             $params[':s1'] = "%{$search}%";
             $params[':s2'] = "%{$search}%";
             $params[':s3'] = "%{$search}%";
             $params[':s4'] = "%{$search}%";
         }
-        $sql .= " ORDER BY c.{$sortCol} {$sortDir} LIMIT 500";
+        if (!empty($situacao)) {
+            $where .= " AND c.situacao = :sit";
+            $params[':sit'] = $situacao;
+        }
+
+        $total = (int) $db->queryOne("SELECT COUNT(*) as n {$where}", $params)['n'];
+
+        $sql = "SELECT c.id, c.nome, c.fone, c.endereco, c.coordenadas, c.situacao, c.cidade_id,
+                       c.complemento, c.latitude, c.longitude, ci.descricao as cidade_descricao
+                {$where} ORDER BY c.{$sortCol} {$sortDir} LIMIT {$limit} OFFSET {$offset}";
         $clientes = $db->query($sql, $params);
-        echo json_encode(['success' => true, 'data' => $clientes]);
+        echo json_encode(['success' => true, 'data' => $clientes, 'total' => $total]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
@@ -300,10 +308,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             </div>
             <div class="filter-bar">
                 <input type="text" id="searchInput" placeholder="🔍 Busca Rápida..." oninput="debounceSearch()">
-                <select id="filterSituacao" onchange="loadClientes()">
+                <select id="filterSituacao" onchange="onFilterChange()">
                     <option value="">Todos</option>
                     <option value="a" selected>Ativo</option>
                     <option value="i">Inativo</option>
+                </select>
+                <select id="pageSizeSelect" onchange="onPageSizeChange()">
+                    <option value="10">10 / pág</option>
+                    <option value="25" selected>25 / pág</option>
+                    <option value="50">50 / pág</option>
+                    <option value="100">100 / pág</option>
                 </select>
                 <button class="btn btn-secondary" onclick="loadClientes()">🔄</button>
                 <span class="counter-badge" id="counterBadge">0 registros</span>
@@ -320,6 +334,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                     </tr></thead>
                     <tbody id="tableBody"><tr><td colspan="6" class="loading">🔄 Carregando...</td></tr></tbody>
                 </table>
+            </div>
+            <div id="paginationBar" style="display:none; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:12px 4px;">
+                <span id="paginationInfo" style="font-size:0.85rem; color:#666;"></span>
+                <div id="paginationControls" style="display:flex; gap:4px; flex-wrap:wrap;"></div>
             </div>
         </div>
 
@@ -431,7 +449,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     let cidadesCache = [];
     let mapInstance = null, mapMarker = null;
 
-    document.addEventListener('DOMContentLoaded', () => { loadClientes(); loadCidades(); setFormDate(); });
+    // ── Paginação ─────────────────────────────────────────────────────────────
+    let currentPage = 1, pageSize = 25, totalItems = 0;
+
+    function readUrlParams() {
+        const p = new URLSearchParams(location.search);
+        currentPage = Math.max(1, parseInt(p.get('page') || '1'));
+        pageSize    = [10,25,50,100].includes(parseInt(p.get('size'))) ? parseInt(p.get('size')) : 25;
+        const sel = document.getElementById('pageSizeSelect');
+        if (sel) sel.value = pageSize;
+    }
+    function syncUrl() {
+        const p = new URLSearchParams(location.search);
+        p.set('page', currentPage); p.set('size', pageSize);
+        history.replaceState(null, '', '?' + p.toString());
+    }
+    function renderPagination() {
+        const bar = document.getElementById('paginationBar');
+        const info = document.getElementById('paginationInfo');
+        const ctrl = document.getElementById('paginationControls');
+        if (!totalItems) { bar.style.display = 'none'; return; }
+        const totalPages = Math.ceil(totalItems / pageSize);
+        const from = Math.min((currentPage-1)*pageSize+1, totalItems);
+        const to   = Math.min(currentPage*pageSize, totalItems);
+        bar.style.display = 'flex';
+        info.textContent  = `${from}–${to} de ${totalItems} registros`;
+        const bs = (active) => `style="padding:6px 10px;border:1px solid ${active?'#1F6F54':'#ddd'};border-radius:6px;background:${active?'#1F6F54':'#fff'};color:${active?'#fff':'#333'};font-size:0.82rem;cursor:pointer;font-weight:${active?'700':'400'};"`;
+        let btns = `<button ${bs(false)} onclick="goPage(1)" ${currentPage===1?'disabled':''}>«</button>`;
+        btns    += `<button ${bs(false)} onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
+        for (let i=Math.max(1,currentPage-2); i<=Math.min(totalPages,currentPage+2); i++)
+            btns += `<button ${bs(i===currentPage)} onclick="goPage(${i})">${i}</button>`;
+        btns += `<button ${bs(false)} onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>`;
+        btns += `<button ${bs(false)} onclick="goPage(${totalPages})" ${currentPage===totalPages?'disabled':''}>»</button>`;
+        ctrl.innerHTML = btns;
+    }
+    function goPage(p) {
+        const tp = Math.ceil(totalItems/pageSize);
+        p = Math.max(1, Math.min(tp, p));
+        if (p === currentPage) return;
+        currentPage = p; syncUrl(); loadClientes();
+    }
+    function onPageSizeChange() {
+        pageSize = parseInt(document.getElementById('pageSizeSelect').value);
+        currentPage = 1; syncUrl(); loadClientes();
+    }
+    function onFilterChange() { currentPage = 1; loadClientes(); }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    document.addEventListener('DOMContentLoaded', () => { readUrlParams(); loadClientes(); loadCidades(); setFormDate(); });
 
     // Fechar mapa com Esc
     document.addEventListener('keydown', e => {
@@ -458,30 +523,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     }
 
     async function loadClientes() {
-        const search = document.getElementById('searchInput').value;
+        const search    = document.getElementById('searchInput').value;
         const sitFilter = document.getElementById('filterSituacao').value;
-        const tbody = document.getElementById('tableBody');
+        const tbody     = document.getElementById('tableBody');
         tbody.innerHTML = '<tr><td colspan="6" class="loading">🔄 Carregando...</td></tr>';
+        const offset = (currentPage - 1) * pageSize;
         try {
-            const url = `cliente.php?ajax=list&search=${encodeURIComponent(search)}&sort=${currentSort}&dir=${currentDir}`;
-            const res = await fetch(url);
+            const url = `cliente.php?ajax=list&search=${encodeURIComponent(search)}&sort=${currentSort}&dir=${currentDir}&situacao=${sitFilter}&limit=${pageSize}&offset=${offset}`;
+            const res  = await fetch(url);
             const data = await res.json();
             if (!data.success) throw new Error(data.error);
 
-            // Filter by situacao on client side
-            let filtered = data.data;
-            if (sitFilter) {
-                filtered = filtered.filter(c => c.situacao === sitFilter);
-            }
+            totalItems = data.total;
+            document.getElementById('counterBadge').textContent = `${totalItems} registros`;
+            renderPagination();
+            syncUrl();
 
-            document.getElementById('counterBadge').textContent = `${filtered.length} registros`;
-
-            if (filtered.length === 0) {
+            if (!data.data.length) {
                 tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">👥</div><p>Nenhum cliente encontrado</p></div></td></tr>';
                 return;
             }
 
-            tbody.innerHTML = filtered.map((c, i) => {
+            tbody.innerHTML = data.data.map((c, i) => {
                 const foneClean = (c.fone || '').replace(/\D/g, '');
                 const hasCoords = c.coordenadas || (c.latitude && c.longitude);
                 const hasPhone = foneClean.length >= 10;
@@ -520,6 +583,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     function sortBy(col) {
         if(currentSort===col) currentDir=currentDir==='ASC'?'DESC':'ASC';
         else { currentSort=col; currentDir='ASC'; }
+        currentPage = 1;
         loadClientes();
     }
     function updateSortHeaders() {
@@ -531,7 +595,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         const a=document.querySelector(`th[data-sort="${currentSort}"]`);
         if(a){ a.classList.add('sorted'); const i=a.querySelector('.sort-icon'); if(i) i.textContent=currentDir==='ASC'?'↑':'↓'; }
     }
-    function debounceSearch() { clearTimeout(searchTimeout); searchTimeout=setTimeout(loadClientes,300); }
+    function debounceSearch() { clearTimeout(searchTimeout); searchTimeout=setTimeout(()=>{currentPage=1;loadClientes();},300); }
 
     // ===== MAP FUNCTIONS =====
     function parseCoordinatesFromString(coordStr) {
