@@ -193,6 +193,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         .action-btn.edit:hover { background:#bfdbfe; }
         .action-btn.delete { background:#fee2e2; color:#dc2626; }
         .action-btn.delete:hover { background:#fecaca; }
+        .action-btn.whatsapp { background:#dcfce7; color:#166534; text-decoration:none; }
+        .action-btn.whatsapp:hover { background:#bbf7d0; }
 
         /* Form View */
         .form-view { display:none; }
@@ -452,6 +454,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                     <td>${esc(f.contato_fone || '')}</td>
                     <td><span class="badge ${isAtivo ? 'badge-success' : 'badge-danger'}">${isAtivo ? 'Ativo' : 'Inativo'}</span></td>
                     <td class="actions" style="justify-content:center">
+                        ${f.contato_fone ? `<a class="action-btn whatsapp" href="https://wa.me/55${f.contato_fone.replace(/\D/g,'')}" target="_blank" title="WhatsApp">💬</a>` : ''}
                         <button class="action-btn edit" onclick="editFornecedor(${f.id})" title="Editar">✏️</button>
                         <button class="action-btn delete" onclick="openDeleteModal(${f.id}, '${esc(f.descricao || '')}')" title="Inativar">🗑️</button>
                     </td>

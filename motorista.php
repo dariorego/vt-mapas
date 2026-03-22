@@ -405,6 +405,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             background: #bbf7d0;
         }
 
+        .action-btn.whatsapp { background:#dcfce7; color:#166534; text-decoration:none; }
+        .action-btn.whatsapp:hover { background:#bbf7d0; }
         .action-btn.map.disabled {
             background: #f3f4f6;
             color: #9ca3af;
@@ -871,6 +873,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                                 <button class="action-btn map ${m.latitude && m.longitude ? '' : 'disabled'}"
                                     onclick="${m.latitude && m.longitude ? `openMapModal(${m.latitude}, ${m.longitude}, '${escapeHtml(m.nome)}')` : 'void(0)'}"
                                     title="${m.latitude && m.longitude ? 'Ver no mapa' : 'Sem localização'}">🗺️</button>
+                                ${m.fone ? `<a class="action-btn whatsapp" href="https://wa.me/55${m.fone.replace(/\D/g,'')}" target="_blank" title="WhatsApp">💬</a>` : ''}
                                 <button class="action-btn edit" onclick="editMotorista(${m.id})" title="Editar">✏️</button>
                                 <button class="action-btn delete" onclick="openDeleteModal(${m.id}, '${escapeHtml(m.nome)}')" title="Inativar">🗑️</button>
                             </div>
