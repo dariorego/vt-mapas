@@ -282,10 +282,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         .table-container { background:var(--card); border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.05); overflow:hidden; }
         table { width:100%; border-collapse:collapse; }
         th,td { padding:12px 14px; text-align:left; border-bottom:1px solid var(--border); }
-        th { background:#f8f9fa; font-weight:600; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); cursor:pointer; user-select:none; transition:background 0.2s; }
-        th:hover { background:var(--primary-bg); }
-        th.sorted { background:var(--primary-bg); color:var(--primary); }
-        th .sort-icon { margin-left:4px; opacity:0.5; }
+        th { background:var(--primary); color:white; font-weight:600; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.5px; cursor:pointer; user-select:none; transition:background 0.2s; }
+        th:hover { background:var(--primary-light); }
+        th.sorted { background:var(--primary-light); }
+        th .sort-icon { margin-left:4px; opacity:0.7; }
         th.sorted .sort-icon { opacity:1; }
         tr:hover { background:#f8f9fa; }
 

@@ -541,25 +541,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             border-bottom: 1px solid var(--border);
         }
 
-        th {
-            background: #f8f9fa;
-            font-weight: 600;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--text-muted);
-            cursor: pointer;
-            user-select: none;
-            transition: background 0.2s;
-        }
-
-        th:hover {
-            background: var(--primary-bg);
-        }
-
-        th.sorted {
-            background: var(--primary-bg);
-            color: var(--primary);
+        th { background:var(--primary); color:white; font-weight:600; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.5px; cursor:pointer; user-select:none; transition:background 0.2s; }
+        th:hover { background:var(--primary-light); }
+        th.sorted { background:var(--primary-light);
         }
 
         th .sort-icon {

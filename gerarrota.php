@@ -343,12 +343,7 @@ $currentPage = 'gerarrota.php';
             border-bottom: 1px solid #eee;
         }
 
-        th {
-            background-color: #f8f9fa;
-            color: var(--secondary-color);
-            border-bottom: 2px solid #ddd;
-            font-weight: 700;
-        }
+        th { background:var(--primary); color:white; font-weight:600; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.5px; }
 
         tr:hover {
             background-color: #f1f1f1;
