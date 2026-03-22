@@ -1,0 +1,10 @@
+Options -Indexes
+RewriteEngine On
+
+# Ignora arquivos e diretórios reais
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Rotas amigáveis
+RewriteRule ^minhaentrega/?$   cliente_tracking.php  [L,QSA]
+RewriteRule ^motorista/?$      motorista_login.php   [L,QSA]

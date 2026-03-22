@@ -3,8 +3,9 @@ FROM php:8.2-apache
 # Instalar extensões necessárias
 RUN docker-php-ext-install pdo pdo_mysql
 
-# Habilitar mod_rewrite do Apache
-RUN a2enmod rewrite
+# Habilitar mod_rewrite e permitir .htaccess
+RUN a2enmod rewrite && \
+    sed -i 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
 
 # Copiar arquivos da aplicação
 COPY . /var/www/html/
