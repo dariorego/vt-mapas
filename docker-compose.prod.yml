@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+
+  # ─── Traefik: Reverse Proxy + SSL ────────────────────────────────────────────
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: always
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=admin@logapp.com.br"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_certs:/letsencrypt
+    networks:
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.logapp.com.br`)"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      - "traefik.http.routers.traefik-dashboard.middlewares=traefik-auth"
+      - "traefik.http.middlewares.traefik-auth.basicauth.users=admin:$$apr1$$xyz$$placeholder"
+
+  # ─── MySQL ────────────────────────────────────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: barretosexpress-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASS}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    networks:
+      - traefik-public
+      - backend
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    ports:
+      - "3306:3306"
+
+  # ─── Aplicação PHP + Apache ───────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: barretosexpress-app
+    restart: always
+    env_file:
+      - .env.prod
+    environment:
+      DB_HOST: db
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+    volumes:
+      - ./data:/var/www/html/data
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - traefik-public
+      - backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.barretosexpress.rule=Host(`barretosexpress.logapp.com.br`)"
+      - "traefik.http.routers.barretosexpress.entrypoints=websecure"
+      - "traefik.http.routers.barretosexpress.tls.certresolver=letsencrypt"
+      - "traefik.http.services.barretosexpress.loadbalancer.server.port=80"
+      - "traefik.docker.network=traefik-public"
+
+volumes:
+  mysql_data:
+    external: true
+    name: barretosexpress_barretosexpress_mysql
+  traefik_certs:
+
+networks:
+  traefik-public:
+    external: true
+    name: traefik-public
+  backend:
+    internal: true
