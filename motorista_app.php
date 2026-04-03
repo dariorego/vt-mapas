@@ -25,6 +25,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'viagens') {
             "SELECT v.id, DATE_FORMAT(v.data_viagem, '%d/%m/%y') AS data_fmt
              FROM viagem v
              WHERE v.motorista_id = ?
+               AND v.data_viagem >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)
              ORDER BY v.data_viagem DESC
              LIMIT 30",
             [$motoristaId]
@@ -172,9 +173,9 @@ if (isset($_GET['logout'])) {
     <title>Entregas - Victor Transportes</title>
     <style>
         :root {
-            --primary:      #1F6F54;
-            --primary-dark: #185C44;
-            --primary-light:#2F8F6B;
+            --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>;
+            --primary-dark: <?php echo EMPRESA_COR_SECUNDARIA; ?>;
+            --primary-light: <?php echo EMPRESA_COR_PRIMARIA; ?>;
             --primary-bg:   #E8F4EF;
             --success:      #22C55E;
             --danger:       #EF4444;

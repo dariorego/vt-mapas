@@ -38,8 +38,8 @@ try {
     <?php $currentPage = 'sobre.php'; ?>
     <style>
         :root {
-            --primary: #2E9D6F;
-            --primary-dark: #248C5A;
+            --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>;
+            --primary-dark: <?php echo EMPRESA_COR_SECUNDARIA; ?>;
             --secondary: #2c3e50;
             --bg: #f4f7f6;
             --card: #ffffff;

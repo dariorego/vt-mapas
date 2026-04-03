@@ -4,6 +4,7 @@ if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
 }
+require_once 'config.php';
 $userName = $_SESSION['user_name'] ?? 'Usuário';
 $isAdmin = !empty($_SESSION['user_is_admin']);
 $currentPage = 'index.php';
@@ -102,9 +103,9 @@ if (!empty($savedConfig)) {
     <title>Victor Transportes - Sistema de Gestão</title>
     <style>
         :root {
-            --primary: #1F6F54;
-            --primary-light: #2F8F6B;
-            --primary-bg: #E8F4EF;
+            --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>;
+            --primary-light: <?php echo EMPRESA_COR_PRIMARIA; ?>;
+            --primary-bg: <?php echo EMPRESA_COR_PRIMARIA; ?>1a;
             --secondary: #3B82F6;
             --success: #22C55E;
             --warning: #F59E0B;

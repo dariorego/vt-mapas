@@ -39,7 +39,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'atualizar_status') {
             throw new Exception('Nenhum registro selecionado.');
         $ids = array_map('intval', $ids);
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $sql = "UPDATE prod_vt.remessa_valor SET remessa_situacao_id = 6 WHERE id IN ($placeholders) AND remessa_situacao_id = 1";
+        $sql = "UPDATE remessa_valor SET remessa_situacao_id = 6 WHERE id IN ($placeholders) AND remessa_situacao_id = 1";
         $updated = $db->execute($sql, $ids);
         echo json_encode(['success' => true, 'message' => "$updated confirmado(s)!", 'updated' => $updated]);
     } catch (Exception $e) {
@@ -57,7 +57,7 @@ if (isset($_POST['ajax']) && $_POST['ajax'] === 'desfazer_entrega') {
             throw new Exception('Nenhum registro selecionado.');
         $ids = array_map('intval', $ids);
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $sql = "UPDATE prod_vt.remessa_valor SET remessa_situacao_id = 1 WHERE id IN ($placeholders) AND remessa_situacao_id = 6";
+        $sql = "UPDATE remessa_valor SET remessa_situacao_id = 1 WHERE id IN ($placeholders) AND remessa_situacao_id = 6";
         $updated = $db->execute($sql, $ids);
         echo json_encode(['success' => true, 'message' => "$updated revertido(s)!", 'updated' => $updated]);
     } catch (Exception $e) {
@@ -71,9 +71,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'fornecedores') {
     header('Content-Type: application/json');
     try {
         $params = [];
-        $sql = "SELECT DISTINCT f.id, f.descricao FROM prod_vt.remessa_valor rv
-                LEFT JOIN prod_vt.fornecedor f ON f.id = rv.fornecedor_id 
-                LEFT JOIN prod_vt.viagem v ON v.id = rv.remessa_viagem_id WHERE f.id IS NOT NULL";
+        $sql = "SELECT DISTINCT f.id, f.descricao FROM remessa_valor rv
+                LEFT JOIN fornecedor f ON f.id = rv.fornecedor_id 
+                LEFT JOIN viagem v ON v.id = rv.remessa_viagem_id WHERE f.id IS NOT NULL";
         if (!empty($_GET['data_inicio'])) {
             $sql .= " AND DATE(v.data_viagem) >= :data_inicio";
             $params[':data_inicio'] = $_GET['data_inicio'];
@@ -98,9 +98,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'clientes') {
         $params = [];
         $sql = "SELECT DISTINCT c.id, c.nome, c.fone, 
                 CONCAT(c.nome, COALESCE(CONCAT(' - ', c.fone), '')) as nome_telefone
-                FROM prod_vt.remessa_valor rv
-                LEFT JOIN prod_vt.cliente c ON c.id = rv.cliente_id 
-                LEFT JOIN prod_vt.viagem v ON v.id = rv.remessa_viagem_id WHERE c.id IS NOT NULL";
+                FROM remessa_valor rv
+                LEFT JOIN cliente c ON c.id = rv.cliente_id 
+                LEFT JOIN viagem v ON v.id = rv.remessa_viagem_id WHERE c.id IS NOT NULL";
         if (!empty($_GET['data_inicio'])) {
             $sql .= " AND DATE(v.data_viagem) >= :data_inicio";
             $params[':data_inicio'] = $_GET['data_inicio'];
@@ -120,8 +120,8 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'clientes') {
 
 // Carrega listas iniciais
 try {
-    $fornecedores = $db->query("SELECT id, descricao FROM prod_vt.fornecedor ORDER BY descricao");
-    $clientes = $db->query("SELECT id, nome, fone, CONCAT(nome, COALESCE(CONCAT(' - ', fone), '')) as nome_telefone FROM prod_vt.cliente ORDER BY nome");
+    $fornecedores = $db->query("SELECT id, descricao FROM fornecedor ORDER BY descricao");
+    $clientes = $db->query("SELECT id, nome, fone, CONCAT(nome, COALESCE(CONCAT(' - ', fone), '')) as nome_telefone FROM cliente ORDER BY nome");
 } catch (Exception $e) {
 }
 
@@ -133,11 +133,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filtrar'])) {
         $sql = "SELECT rv.id, rv.qde, rv.cliente_id, c.nome AS cliente_nome, c.fone AS cliente_telefone,
                 rv.fornecedor_id, f.descricao AS fornecedor_descricao, rv.remessa_situacao_id, 
                 rs.descricao AS situacao_descricao, v.data_viagem
-                FROM prod_vt.remessa_valor rv
-                LEFT JOIN prod_vt.cliente c ON c.id = rv.cliente_id 
-                LEFT JOIN prod_vt.fornecedor f ON f.id = rv.fornecedor_id 
-                LEFT JOIN prod_vt.remessa_situacao rs ON rs.id = rv.remessa_situacao_id 
-                LEFT JOIN prod_vt.viagem v ON v.id = rv.remessa_viagem_id";
+                FROM remessa_valor rv
+                LEFT JOIN cliente c ON c.id = rv.cliente_id 
+                LEFT JOIN fornecedor f ON f.id = rv.fornecedor_id 
+                LEFT JOIN remessa_situacao rs ON rs.id = rv.remessa_situacao_id 
+                LEFT JOIN viagem v ON v.id = rv.remessa_viagem_id";
 
         if (!empty($filtroDataInicio)) {
             $whereConditions[] = "DATE(v.data_viagem) >= :data_inicio";
@@ -204,9 +204,9 @@ foreach ($resultados as $row) {
     <style>
         :root {
             /* Nova paleta - mais elegante e menos saturada */
-            --primary: #1F6F54;
-            --primary-light: #2F8F6B;
-            --primary-bg: #E8F4EF;
+            --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>;
+            --primary-light: <?php echo EMPRESA_COR_PRIMARIA; ?>;
+            --primary-bg: <?php echo EMPRESA_COR_PRIMARIA; ?>1a;
             --secondary: #3B82F6;
             --success: #22C55E;
             --warning: #F59E0B;
@@ -755,6 +755,52 @@ foreach ($resultados as $row) {
                 display: none;
             }
         }
+
+        /* Índice Alfabético Lateral */
+        .alpha-index {
+            position: fixed;
+            right: 4px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            z-index: 200;
+            background: rgba(255,255,255,0.85);
+            border-radius: 10px;
+            padding: 4px 2px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+        }
+
+        .alpha-index a {
+            display: block;
+            width: 22px;
+            height: 22px;
+            line-height: 22px;
+            text-align: center;
+            font-size: 0.65rem;
+            font-weight: 700;
+            border-radius: 4px;
+            text-decoration: none;
+            color: var(--primary);
+            transition: background 0.15s;
+        }
+
+        .alpha-index a:hover,
+        .alpha-index a.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .alpha-index a.disabled {
+            color: #ccc;
+            pointer-events: none;
+        }
+
+        @media (max-width: 360px) {
+            .alpha-index { right: 2px; }
+            .alpha-index a { width: 18px; height: 18px; line-height: 18px; font-size: 0.55rem; }
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
@@ -872,8 +918,35 @@ foreach ($resultados as $row) {
                 </div>
             </div>
 
-            <?php foreach ($clientesAgrupados as $clienteId => $cliente): ?>
-                <div class="client-card">
+            <?php
+            // Coleta letras disponíveis
+            $letrasDisponiveis = [];
+            $letrasVistas = [];
+            foreach ($clientesAgrupados as $clienteId => $cliente) {
+                $letra = strtoupper(mb_substr($cliente['nome'], 0, 1, 'UTF-8'));
+                if (!in_array($letra, $letrasDisponiveis)) {
+                    $letrasDisponiveis[] = $letra;
+                }
+            }
+            ?>
+
+            <!-- Índice Alfabético -->
+            <div class="alpha-index">
+                <?php foreach (range('A', 'Z') as $l): ?>
+                    <a href="#letra-<?= $l ?>"
+                       class="<?= in_array($l, $letrasDisponiveis) ? '' : 'disabled' ?>"><?= $l ?></a>
+                <?php endforeach; ?>
+            </div>
+
+            <?php foreach ($clientesAgrupados as $clienteId => $cliente):
+                $letraCliente = strtoupper(mb_substr($cliente['nome'], 0, 1, 'UTF-8'));
+                $anchorId = '';
+                if (!in_array($letraCliente, $letrasVistas)) {
+                    $letrasVistas[] = $letraCliente;
+                    $anchorId = ' id="letra-' . $letraCliente . '"';
+                }
+            ?>
+                <div class="client-card"<?= $anchorId ?>>
                     <div class="client-header">
                         <div class="client-name"><?php echo htmlspecialchars($cliente['nome']); ?></div>
                         <?php if (!empty($cliente['telefone'])): ?>
@@ -940,6 +1013,27 @@ foreach ($resultados as $row) {
     <script>
         let idAcao = null;
         let tipoAcao = 'confirmar';
+
+        // Highlight letra ativa no índice ao rolar
+        (function() {
+            const alphaLinks = document.querySelectorAll('.alpha-index a:not(.disabled)');
+            if (!alphaLinks.length) return;
+            const anchors = Array.from(alphaLinks).map(a => {
+                const id = a.getAttribute('href').replace('#', '');
+                return { el: document.getElementById(id), link: a };
+            }).filter(x => x.el);
+
+            function updateActive() {
+                let current = anchors[0];
+                for (const item of anchors) {
+                    if (item.el.getBoundingClientRect().top <= 80) current = item;
+                }
+                alphaLinks.forEach(a => a.classList.remove('active'));
+                if (current) current.link.classList.add('active');
+            }
+            window.addEventListener('scroll', updateActive, { passive: true });
+            updateActive();
+        })();
 
         // PDF Generation
         function generatePDF() {

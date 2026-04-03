@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 // Busca motorista ativo pelo login
                 $motorista = $db->queryOne(
-                    "SELECT id, nome FROM prod_vt.motorista WHERE usuario = ? AND situacao = 'a' LIMIT 1",
+                    "SELECT id, nome FROM motorista WHERE usuario = ? AND situacao = 'a' LIMIT 1",
                     [$usuario]
                 );
 
@@ -70,9 +70,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>Motorista - Victor Transportes</title>
     <style>
         :root {
-            --primary: #1F6F54;
-            --primary-dark: #185C44;
-            --primary-light: #2F8F6B;
+            --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>;
+            --primary-dark: <?php echo EMPRESA_COR_SECUNDARIA; ?>;
+            --primary-light: <?php echo EMPRESA_COR_PRIMARIA; ?>;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }

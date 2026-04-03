@@ -25,7 +25,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
         $situacao = $_GET['situacao'] ?? '';
 
         $params = [];
-        $where  = "FROM prod_vt.fornecedor WHERE 1=1";
+        $where  = "FROM fornecedor WHERE 1=1";
 
         if (!empty($search)) {
             $where .= " AND (descricao LIKE :s1 OR contato_nome LIKE :s2 OR contato_fone LIKE :s3 OR endereco LIKE :s4 OR CAST(id AS CHAR) LIKE :s5)";
@@ -62,7 +62,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'get') {
         $id = intval($_GET['id'] ?? 0);
         if (!$id) throw new Exception('ID inválido');
         $fornecedor = $db->queryOne("SELECT id, descricao, contato_nome, contato_fone, situacao, endereco
-                                     FROM prod_vt.fornecedor WHERE id = ?", [$id]);
+                                     FROM fornecedor WHERE id = ?", [$id]);
         if (!$fornecedor) throw new Exception('Fornecedor não encontrado');
         echo json_encode(['success' => true, 'data' => $fornecedor]);
     } catch (Exception $e) {
@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
 
         if (empty($descricao)) throw new Exception('Estabelecimento é obrigatório');
 
-        $sql = "INSERT INTO prod_vt.fornecedor (descricao, contato_nome, contato_fone, situacao, endereco)
+        $sql = "INSERT INTO fornecedor (descricao, contato_nome, contato_fone, situacao, endereco)
                 VALUES (?, ?, ?, ?, ?)";
         $db->execute($sql, [$descricao, $contato_nome, $contato_fone, $situacao, $endereco]);
         $newId = $db->lastInsertId();
@@ -109,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
 
         if (empty($descricao)) throw new Exception('Estabelecimento é obrigatório');
 
-        $sql = "UPDATE prod_vt.fornecedor SET descricao=?, contato_nome=?, contato_fone=?, situacao=?, endereco=? WHERE id=?";
+        $sql = "UPDATE fornecedor SET descricao=?, contato_nome=?, contato_fone=?, situacao=?, endereco=? WHERE id=?";
         $db->execute($sql, [$descricao, $contato_nome, $contato_fone, $situacao, $endereco, $id]);
         echo json_encode(['success' => true, 'message' => 'Fornecedor atualizado com sucesso!']);
     } catch (Exception $e) {
@@ -125,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         $id = intval($_POST['id'] ?? 0);
         if (!$id) throw new Exception('ID inválido');
         // Soft delete - muda situação para Inativo
-        $db->execute("UPDATE prod_vt.fornecedor SET situacao = 'Inativo' WHERE id = ?", [$id]);
+        $db->execute("UPDATE fornecedor SET situacao = 'Inativo' WHERE id = ?", [$id]);
         echo json_encode(['success' => true, 'message' => 'Fornecedor inativado com sucesso!']);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -141,7 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     <title>Fornecedores - Victor Transportes</title>
     <style>
         :root {
-            --primary: #1F6F54; --primary-light: #2F8F6B; --primary-bg: #E8F4EF;
+            --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>; --primary-light: <?php echo EMPRESA_COR_PRIMARIA; ?>; --primary-bg: <?php echo EMPRESA_COR_PRIMARIA; ?>1a;
             --secondary: #3B82F6; --success: #22C55E; --warning: #F59E0B; --danger: #EF4444;
             --bg: #F6F8F9; --card: #ffffff; --text: #1F2933; --text-muted: #6B7280; --border: #E5E7EB;
         }
@@ -246,6 +246,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             table { min-width:800px; }
             .form-grid { grid-template-columns:1fr; }
         }
+
     </style>
 </head>
 <body>
@@ -362,6 +363,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     <div class="toast" id="toast"></div>
 
     <script>
+    var VT_PRIMARY = '<?php echo EMPRESA_COR_PRIMARIA; ?>';
+    var VT_TEXTO   = '<?php echo EMPRESA_COR_TEXTO; ?>';
     let currentSort = 'descricao', currentDir = 'ASC', searchTimeout = null, deleteId = null;
 
     // ── Paginação ─────────────────────────────────────────────────────────────
@@ -388,7 +391,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         const to   = Math.min(currentPage*pageSize, totalItems);
         bar.style.display = 'flex';
         info.textContent  = `${from}–${to} de ${totalItems} registros`;
-        const bs = (active) => `style="padding:6px 10px;border:1px solid ${active?'#1F6F54':'#ddd'};border-radius:6px;background:${active?'#1F6F54':'#fff'};color:${active?'#fff':'#333'};font-size:0.82rem;cursor:pointer;font-weight:${active?'700':'400'};"`;
+        const bs = (active) => `style="padding:6px 10px;border:1px solid ${active?VT_PRIMARY:'#ddd'};border-radius:6px;background:${active?VT_PRIMARY:'#fff'};color:${active?VT_TEXTO:'#333'};font-size:0.82rem;cursor:pointer;font-weight:${active?'700':'400'};"`;
         let btns = `<button ${bs(false)} onclick="goPage(1)" ${currentPage===1?'disabled':''}>«</button>`;
         btns    += `<button ${bs(false)} onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
         for (let i=Math.max(1,currentPage-2); i<=Math.min(totalPages,currentPage+2); i++)

@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = new Database();
 
             $sql = "SELECT login, pswd, name, email, active, priv_admin, picture, novo_sistema 
-                    FROM prod_vt.sec_users 
+                    FROM sec_users 
                     WHERE login = :login 
                     LIMIT 1";
 
@@ -81,8 +81,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>Login - Victor Transportes</title>
     <style>
         :root {
-            --primary: #2E9D6F;
-            --primary-dark: #248C5A;
+            --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>;
+            --primary-dark: <?php echo EMPRESA_COR_SECUNDARIA; ?>;
             --bg: #f4f7f6;
             --card: #ffffff;
             --text: #333;

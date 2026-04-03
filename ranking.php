@@ -32,9 +32,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking_clientes') {
                     SUM(COALESCE(r.pacote_qde, 0)) as total_pacotes,
                     MAX(v.data_viagem) as ultimo_uso,
                     MIN(v.data_viagem) as primeiro_uso
-                FROM prod_vt.cliente c
-                INNER JOIN prod_vt.remessa r ON r.cliente_id = c.id
-                INNER JOIN prod_vt.viagem v ON v.id = r.viagem_id
+                FROM cliente c
+                INNER JOIN remessa r ON r.cliente_id = c.id
+                INNER JOIN viagem v ON v.id = r.viagem_id
                 WHERE c.id NOT IN (120, 197)";
         
         if (!empty($dataInicio)) {
@@ -57,9 +57,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking_clientes') {
                         COUNT(DISTINCT c.id) as total_clientes,
                         COUNT(r.id) as total_pedidos,
                         SUM(COALESCE(r.total, 0)) as valor_total
-                     FROM prod_vt.cliente c
-                     INNER JOIN prod_vt.remessa r ON r.cliente_id = c.id
-                     INNER JOIN prod_vt.viagem v ON v.id = r.viagem_id
+                     FROM cliente c
+                     INNER JOIN remessa r ON r.cliente_id = c.id
+                     INNER JOIN viagem v ON v.id = r.viagem_id
                      WHERE c.id NOT IN (120, 197)";
         
         $paramsTotal = [];
@@ -99,9 +99,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking_fornecedores') {
                     MIN(v.data_viagem) as primeiro_uso,
                     SUM(CASE WHEN rv.remessa_situacao_id = 6 THEN 1 ELSE 0 END) as total_entregues,
                     SUM(CASE WHEN rv.remessa_situacao_id = 1 THEN 1 ELSE 0 END) as total_pendentes
-                FROM prod_vt.fornecedor f
-                INNER JOIN prod_vt.remessa_valor rv ON rv.fornecedor_id = f.id
-                INNER JOIN prod_vt.viagem v ON v.id = rv.remessa_viagem_id
+                FROM fornecedor f
+                INNER JOIN remessa_valor rv ON rv.fornecedor_id = f.id
+                INNER JOIN viagem v ON v.id = rv.remessa_viagem_id
                 WHERE 1=1";
         
         if (!empty($dataInicio)) {
@@ -124,9 +124,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking_fornecedores') {
                         COUNT(DISTINCT f.id) as total_fornecedores,
                         COUNT(rv.id) as total_entregas,
                         SUM(COALESCE(rv.qde, 0)) as total_quantidade
-                     FROM prod_vt.fornecedor f
-                     INNER JOIN prod_vt.remessa_valor rv ON rv.fornecedor_id = f.id
-                     INNER JOIN prod_vt.viagem v ON v.id = rv.remessa_viagem_id
+                     FROM fornecedor f
+                     INNER JOIN remessa_valor rv ON rv.fornecedor_id = f.id
+                     INNER JOIN viagem v ON v.id = rv.remessa_viagem_id
                      WHERE 1=1";
         
         $paramsTotal = [];
@@ -156,7 +156,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'ranking_fornecedores') {
     <title>Ranking - Victor Transportes</title>
     <style>
         :root {
-            --primary: #1F6F54; --primary-light: #2F8F6B; --primary-bg: #E8F4EF;
+            --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>; --primary-light: <?php echo EMPRESA_COR_PRIMARIA; ?>; --primary-bg: <?php echo EMPRESA_COR_PRIMARIA; ?>1a;
             --secondary: #3B82F6; --success: #22C55E; --warning: #F59E0B; --danger: #EF4444;
             --bg: #F6F8F9; --card: #ffffff; --text: #1F2933; --text-muted: #6B7280; --border: #E5E7EB;
             --gold: #F59E0B; --silver: #94A3B8; --bronze: #D97706;

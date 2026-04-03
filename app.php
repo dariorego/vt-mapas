@@ -10,6 +10,7 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+require_once 'config.php';
 $isAdmin = !empty($_SESSION['user_is_admin']);
 $userName = $_SESSION['user_name'] ?? 'Usuário';
 ?>
@@ -22,9 +23,9 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
     <title>Victor Transportes - Sistema de Gestão</title>
     <style>
         :root {
-            --primary: #2E9D6F;
-            --primary-dark: #248C5A;
-            --primary-light: #2A9D6C;
+            --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>;
+            --primary-dark: <?php echo EMPRESA_COR_SECUNDARIA; ?>;
+            --primary-light: <?php echo EMPRESA_COR_PRIMARIA; ?>;
             --bg: #f4f7f6;
             --card: #ffffff;
             --text: #1F2933;

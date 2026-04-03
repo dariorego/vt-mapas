@@ -56,7 +56,7 @@ function authenticate(string $login, string $password): array
 
     // Busca usuário pelo login
     $sql = "SELECT login, pswd, name, email, active, activation_code, priv_admin, mfa, picture, novo_sistema 
-            FROM prod_vt.sec_users 
+            FROM sec_users 
             WHERE login = :login 
             LIMIT 1";
 

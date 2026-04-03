@@ -50,7 +50,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
                     COALESCE(rs.descricao, 'N/A') as situacao_nome,
                     (SELECT COUNT(*) FROM remessa r WHERE r.viagem_id = v.id) as qde_pedido
                 FROM viagem v
-                LEFT JOIN prod_vt.motorista m ON m.id = v.motorista_id
+                LEFT JOIN motorista m ON m.id = v.motorista_id
                 LEFT JOIN remessa_situacao rs ON rs.id = v.remessa_situacao_id
                 WHERE 1=1";
 
@@ -80,7 +80,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
 
         // Total count for pagination (same query without LIMIT)
         $countSql = "SELECT COUNT(*) as total FROM viagem v
-                LEFT JOIN prod_vt.motorista m ON m.id = v.motorista_id
+                LEFT JOIN motorista m ON m.id = v.motorista_id
                 LEFT JOIN remessa_situacao rs ON rs.id = v.remessa_situacao_id
                 WHERE 1=1";
         // Rebuild WHERE conditions for count
@@ -110,7 +110,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
         $statsSql = "SELECT COUNT(*) as total_viagens,
                      COALESCE(SUM((SELECT COUNT(*) FROM remessa r WHERE r.viagem_id = v.id)), 0) as total_pedidos
                      FROM viagem v
-                     LEFT JOIN prod_vt.motorista m ON m.id = v.motorista_id
+                     LEFT JOIN motorista m ON m.id = v.motorista_id
                      LEFT JOIN remessa_situacao rs ON rs.id = v.remessa_situacao_id
                      WHERE 1=1";
         $statsParams = [];
@@ -180,7 +180,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'get') {
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'motoristas') {
     header('Content-Type: application/json');
     try {
-        $motoristas = $db->query("SELECT id, nome FROM prod_vt.motorista WHERE situacao = 'a' ORDER BY nome");
+        $motoristas = $db->query("SELECT id, nome FROM motorista WHERE situacao = 'a' ORDER BY nome");
         echo json_encode(['success' => true, 'data' => $motoristas]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -195,7 +195,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'motoristas_periodo') {
         $params = [];
         $sql = "SELECT DISTINCT m.id, m.nome 
                 FROM viagem v
-                INNER JOIN prod_vt.motorista m ON m.id = v.motorista_id
+                INNER JOIN motorista m ON m.id = v.motorista_id
                 WHERE 1=1";
         if (!empty($_GET['data_inicio'])) {
             $sql .= " AND DATE(v.data_viagem) >= :data_inicio";
@@ -309,9 +309,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     <title>Viagens - Victor Transportes</title>
     <style>
         :root {
-            --primary: #1F6F54;
-            --primary-light: #2F8F6B;
-            --primary-bg: #E8F4EF;
+            --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>;
+            --primary-light: <?php echo EMPRESA_COR_PRIMARIA; ?>;
+            --primary-bg: <?php echo EMPRESA_COR_PRIMARIA; ?>1a;
             --secondary: #3B82F6;
             --success: #22C55E;
             --warning: #F59E0B;

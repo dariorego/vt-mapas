@@ -33,7 +33,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
 
         $params = [];
-        $where  = "FROM prod_vt.motorista WHERE 1=1";
+        $where  = "FROM motorista WHERE 1=1";
 
         if (!empty($search)) {
             $where .= " AND nome LIKE :search";
@@ -62,7 +62,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'get') {
             throw new Exception('ID inválido');
 
         $motorista = $db->queryOne("SELECT id, nome, situacao, fone, carro_id, usuario 
-                                    FROM prod_vt.motorista WHERE id = ?", [$id]);
+                                    FROM motorista WHERE id = ?", [$id]);
         if (!$motorista)
             throw new Exception('Motorista não encontrado');
 
@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         $latitude = $latitude !== '' ? floatval($latitude) : null;
         $longitude = $longitude !== '' ? floatval($longitude) : null;
 
-        $sql = "INSERT INTO prod_vt.motorista (nome, fone, usuario, senha, situacao, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        $sql = "INSERT INTO motorista (nome, fone, usuario, senha, situacao, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?)";
         $senhaHash = !empty($senha) ? password_hash($senha, PASSWORD_DEFAULT) : '';
 
         $db->execute($sql, [$nome, $fone, $usuario, $senhaHash, $situacao, $latitude, $longitude]);
@@ -127,11 +127,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         $longitude = $longitude !== '' ? floatval($longitude) : null;
 
         if (!empty($senha)) {
-            $sql = "UPDATE prod_vt.motorista SET nome = ?, fone = ?, usuario = ?, senha = ?, situacao = ?, latitude = ?, longitude = ? WHERE id = ?";
+            $sql = "UPDATE motorista SET nome = ?, fone = ?, usuario = ?, senha = ?, situacao = ?, latitude = ?, longitude = ? WHERE id = ?";
             $senhaHash = password_hash($senha, PASSWORD_DEFAULT);
             $db->execute($sql, [$nome, $fone, $usuario, $senhaHash, $situacao, $latitude, $longitude, $id]);
         } else {
-            $sql = "UPDATE prod_vt.motorista SET nome = ?, fone = ?, usuario = ?, situacao = ?, latitude = ?, longitude = ? WHERE id = ?";
+            $sql = "UPDATE motorista SET nome = ?, fone = ?, usuario = ?, situacao = ?, latitude = ?, longitude = ? WHERE id = ?";
             $db->execute($sql, [$nome, $fone, $usuario, $situacao, $latitude, $longitude, $id]);
         }
 
@@ -151,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             throw new Exception('ID inválido');
 
         // Soft delete - apenas inativa
-        $db->execute("UPDATE prod_vt.motorista SET situacao = 'i' WHERE id = ?", [$id]);
+        $db->execute("UPDATE motorista SET situacao = 'i' WHERE id = ?", [$id]);
 
         echo json_encode(['success' => true, 'message' => 'Motorista inativado com sucesso!']);
     } catch (Exception $e) {
@@ -169,9 +169,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     <title>Motoristas - Victor Transportes</title>
     <style>
         :root {
-            --primary: #1F6F54;
-            --primary-light: #2F8F6B;
-            --primary-bg: #E8F4EF;
+            --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>;
+            --primary-light: <?php echo EMPRESA_COR_PRIMARIA; ?>;
+            --primary-bg: <?php echo EMPRESA_COR_PRIMARIA; ?>1a;
             --secondary: #3B82F6;
             --success: #22C55E;
             --warning: #F59E0B;
@@ -734,6 +734,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     <div class="toast" id="toast"></div>
 
     <script>
+        var VT_PRIMARY = '<?php echo EMPRESA_COR_PRIMARIA; ?>';
+        var VT_TEXTO   = '<?php echo EMPRESA_COR_TEXTO; ?>';
+
         // Estado
         let currentSort = 'nome';
         let currentDir  = 'ASC';
@@ -775,8 +778,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             info.textContent   = `${from}–${to} de ${totalItems} registros`;
 
             const btnStyle = (active) =>
-                `style="padding:6px 10px;border:1px solid ${active ? '#1F6F54' : '#ddd'};border-radius:6px;` +
-                `background:${active ? '#1F6F54' : '#fff'};color:${active ? '#fff' : '#333'};` +
+                `style="padding:6px 10px;border:1px solid ${active ? VT_PRIMARY : '#ddd'};border-radius:6px;` +
+                `background:${active ? VT_PRIMARY : '#fff'};color:${active ? VT_TEXTO : '#333'};` +
                 `font-size:0.82rem;cursor:pointer;font-weight:${active ? '700' : '400'};"`;
 
             let btns = `<button ${btnStyle(false)} onclick="goPage(1)" ${currentPage===1?'disabled':''}>«</button>`;

@@ -167,7 +167,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         :root {
-            --primary: #1F6F54; --primary-light: #2F8F6B; --primary-bg: #E8F4EF;
+            --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>; --primary-light: <?php echo EMPRESA_COR_PRIMARIA; ?>; --primary-bg: <?php echo EMPRESA_COR_PRIMARIA; ?>1a;
             --secondary: #3B82F6; --success: #22C55E; --warning: #F59E0B; --danger: #EF4444;
             --bg: #F6F8F9; --card: #ffffff; --text: #1F2933; --text-muted: #6B7280; --border: #E5E7EB;
         }
@@ -294,6 +294,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             table { min-width:900px; }
             .form-grid { grid-template-columns:1fr; }
         }
+
     </style>
 </head>
 <body>
@@ -445,6 +446,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     <div class="toast" id="toast"></div>
 
     <script>
+    var VT_PRIMARY = '<?php echo EMPRESA_COR_PRIMARIA; ?>';
+    var VT_TEXTO   = '<?php echo EMPRESA_COR_TEXTO; ?>';
     let currentSort = 'nome', currentDir = 'ASC', searchTimeout = null, deleteId = null;
     let cidadesCache = [];
     let mapInstance = null, mapMarker = null;
@@ -474,7 +477,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         const to   = Math.min(currentPage*pageSize, totalItems);
         bar.style.display = 'flex';
         info.textContent  = `${from}–${to} de ${totalItems} registros`;
-        const bs = (active) => `style="padding:6px 10px;border:1px solid ${active?'#1F6F54':'#ddd'};border-radius:6px;background:${active?'#1F6F54':'#fff'};color:${active?'#fff':'#333'};font-size:0.82rem;cursor:pointer;font-weight:${active?'700':'400'};"`;
+        const bs = (active) => `style="padding:6px 10px;border:1px solid ${active?VT_PRIMARY:'#ddd'};border-radius:6px;background:${active?VT_PRIMARY:'#fff'};color:${active?VT_TEXTO:'#333'};font-size:0.82rem;cursor:pointer;font-weight:${active?'700':'400'};"`;
         let btns = `<button ${bs(false)} onclick="goPage(1)" ${currentPage===1?'disabled':''}>«</button>`;
         btns    += `<button ${bs(false)} onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
         for (let i=Math.max(1,currentPage-2); i<=Math.min(totalPages,currentPage+2); i++)

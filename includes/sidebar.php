@@ -65,12 +65,13 @@ $pageTitles = [
     'ranking.php' => '🏆 Ranking',
     'configuracoes.php' => '⚙️ Configurações',
     'landing_config.php' => '🌐 Landing Page',
+    'usuarios.php' => '👤 Usuários',
     'sobre.php' => 'ℹ️ Sobre'
 ];
 $pageTitle = $pageTitles[$currentPage] ?? '🚚 Victor Transportes';
 
 // Verifica se está em uma página de cadastros para manter submenu aberto
-$isCadastrosPage = in_array($currentPage, ['motorista.php', 'cliente.php', 'fornecedor.php']);
+$isCadastrosPage = in_array($currentPage, ['motorista.php', 'cliente.php', 'fornecedor.php', 'usuarios.php']);
 // Verifica se está em uma página de viagens para manter submenu aberto
 $isViagensPage = in_array($currentPage, ['viagem.php', 'pedido.php', 'gerarrota.php']);
 // Verifica se está em uma página de fornecedor para manter submenu aberto
@@ -78,6 +79,11 @@ $isFornecedorPage = in_array($currentPage, ['validafornecedor.php']);
 // Verifica se está em uma página de relatórios para manter submenu aberto
 $isRelatoriosPage = in_array($currentPage, ['ranking.php']);
 ?>
+<script>
+var VT_PRIMARY   = '<?php echo EMPRESA_COR_PRIMARIA; ?>';
+var VT_SECONDARY = '<?php echo EMPRESA_COR_SECUNDARIA; ?>';
+var VT_TEXTO     = '<?php echo EMPRESA_COR_TEXTO; ?>';
+</script>
 <style>
     :root {
         --sidebar-width: 260px;
@@ -85,6 +91,11 @@ $isRelatoriosPage = in_array($currentPage, ['ranking.php']);
         --sidebar-bg-start: <?php echo EMPRESA_COR_PRIMARIA; ?>;
         --sidebar-bg-end: <?php echo EMPRESA_COR_SECUNDARIA; ?>;
         --sidebar-transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        /* Sobrescreve cores das páginas via config.php */
+        --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>;
+        --primary-light: <?php echo EMPRESA_COR_PRIMARIA; ?>;
+        --primary-dark: <?php echo EMPRESA_COR_SECUNDARIA; ?>;
+        --primary-bg: <?php echo EMPRESA_COR_PRIMARIA; ?>1a;
     }
 
     /* Mobile Header */
@@ -650,6 +661,13 @@ $isRelatoriosPage = in_array($currentPage, ['ranking.php']);
                 <span class="label">Fornecedores</span>
                 <span class="tooltip">Fornecedores</span>
             </a>
+            <?php if ($isAdmin): ?>
+            <a href="usuarios.php" class="nav-link <?php echo $currentPage === 'usuarios.php' ? 'active' : ''; ?>">
+                <span class="icon">👤</span>
+                <span class="label">Usuários</span>
+                <span class="tooltip">Usuários</span>
+            </a>
+            <?php endif; ?>
         </div>
 
         <!-- Viagens Submenu -->

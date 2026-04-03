@@ -187,8 +187,8 @@ $currentPage = 'gerarrota.php';
 
     <style>
         :root {
-            --primary-color: #2E9D6F;
-            --primary-dark: #248C5A;
+            --primary-color: <?php echo EMPRESA_COR_PRIMARIA; ?>;
+            --primary-dark: <?php echo EMPRESA_COR_SECUNDARIA; ?>;
             --secondary-color: #2c3e50;
             --background-color: #f4f7f6;
             --card-background: #ffffff;
@@ -476,6 +476,8 @@ $currentPage = 'gerarrota.php';
     </div>
 
     <script>
+        var VT_PRIMARY = '<?php echo EMPRESA_COR_PRIMARIA; ?>';
+        var VT_TEXTO   = '<?php echo EMPRESA_COR_TEXTO; ?>';
         // ── Decoder de Google Encoded Polyline ───────────────────────────────────
         // Converte a string encodada do Google em array [[lat, lng], ...]
         function decodePolyline(encoded) {
@@ -611,7 +613,7 @@ $currentPage = 'gerarrota.php';
                 }
 
                 if (roadCoords.length > 0) {
-                    polyline = L.polyline(roadCoords, { color: '#2E9D6F', weight: 4, opacity: 0.85 }).addTo(map);
+                    polyline = L.polyline(roadCoords, { color: VT_PRIMARY, weight: 4, opacity: 0.85 }).addTo(map);
                 }
                 return;
             }
@@ -624,7 +626,7 @@ $currentPage = 'gerarrota.php';
             if (!hideEndLine && driverPoint) pointsToDraw.push([driverPoint.latitude, driverPoint.longitude]);
 
             if (pointsToDraw.length > 0) {
-                polyline = L.polyline(pointsToDraw, { color: '#2E9D6F', weight: 4, opacity: 0.8, dashArray: '8 4' }).addTo(map);
+                polyline = L.polyline(pointsToDraw, { color: VT_PRIMARY, weight: 4, opacity: 0.8, dashArray: '8 4' }).addTo(map);
             }
         }
 
@@ -648,7 +650,7 @@ $currentPage = 'gerarrota.php';
         function createNumberIcon(num) {
             return L.divIcon({
                 className: 'custom-marker',
-                html: `<div style='background-color:#2E9D6F; color:white; border-radius:50%; width:28px; height:28px; display:flex; justify-content:center; align-items:center; font-weight:bold; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3);'>${num}</div>`,
+                html: `<div style='background-color:${VT_PRIMARY}; color:${VT_TEXTO}; border-radius:50%; width:28px; height:28px; display:flex; justify-content:center; align-items:center; font-weight:bold; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3);'>${num}</div>`,
                 iconSize: [28, 28], iconAnchor: [14, 14]
             });
         }
