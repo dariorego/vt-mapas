@@ -138,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fornecedores - Victor Transportes</title>
+    <title>Fornecedores - <?php echo EMPRESA_NOME; ?></title>
     <style>
         :root {
             --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>; --primary-light: <?php echo EMPRESA_COR_PRIMARIA; ?>; --primary-bg: <?php echo EMPRESA_COR_PRIMARIA; ?>1a;

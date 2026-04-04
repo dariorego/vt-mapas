@@ -11,10 +11,10 @@
 if (isset($_GET['notabs']) && $_GET['notabs'] === '1') {
     // Apenas adiciona estilo para página sem sidebar
     echo '<style>
-        .page-with-sidebar { 
-            margin-left: 0 !important; 
+        .page-with-sidebar {
+            margin-left: 0 !important;
             width: 100% !important;
-            padding-top: 0 !important;
+            padding-top: 15px !important;
         }
     </style>';
     return;
@@ -33,13 +33,13 @@ if (window.self !== window.top) {
         document.querySelectorAll(".page-with-sidebar").forEach(function(el) {
             el.style.marginLeft = "0";
             el.style.width = "100%";
-            el.style.paddingTop = "0";
+            el.style.paddingTop = "15px";
         });
     });
 }
 </script>';
 // Se estiver num iframe, não renderiza o sidebar HTML
-echo '<script>if(window.self!==window.top){document.write("<style>.sidebar,.mobile-header,#overlay{display:none!important}.page-with-sidebar{margin-left:0!important;width:100%!important;padding-top:0!important}</style>");}</script>';
+echo '<script>if(window.self!==window.top){document.write("<style>.sidebar,.mobile-header,#overlay{display:none!important}.page-with-sidebar{margin-left:0!important;width:100%!important;padding-top:15px!important}</style>");}</script>';
 
 
 // Detecta a página atual se não foi definida
@@ -58,6 +58,7 @@ $pageTitles = [
     'validafornecedor.php' => '📦 Validar Fornecedor',
     'optimize_routes.php' => '🛣️ Otimizar Rotas',
     'motorista.php' => '🚗 Motoristas',
+    'carro.php' => '🚛 Carros',
     'cliente.php' => '👥 Clientes',
     'fornecedor.php' => '🏭 Fornecedores',
     'viagem.php' => '🚐 Relação de Viagem',
@@ -66,12 +67,15 @@ $pageTitles = [
     'configuracoes.php' => '⚙️ Configurações',
     'landing_config.php' => '🌐 Landing Page',
     'usuarios.php' => '👤 Usuários',
+    'cidade.php'          => '🏙️ Cidades',
+    'remessa_situacao.php'=> '📋 Situação Remessa',
     'sobre.php' => 'ℹ️ Sobre'
 ];
 $pageTitle = $pageTitles[$currentPage] ?? '🚚 Victor Transportes';
 
 // Verifica se está em uma página de cadastros para manter submenu aberto
-$isCadastrosPage = in_array($currentPage, ['motorista.php', 'cliente.php', 'fornecedor.php', 'usuarios.php']);
+$isCadastrosPage = in_array($currentPage, ['motorista.php', 'carro.php', 'cliente.php', 'fornecedor.php', 'usuarios.php']);
+$isCadastrosGeraisPage = in_array($currentPage, ['cidade.php', 'remessa_situacao.php', 'forma_pagamento.php']);
 // Verifica se está em uma página de viagens para manter submenu aberto
 $isViagensPage = in_array($currentPage, ['viagem.php', 'pedido.php', 'gerarrota.php']);
 // Verifica se está em uma página de fornecedor para manter submenu aberto
@@ -651,6 +655,11 @@ var VT_TEXTO     = '<?php echo EMPRESA_COR_TEXTO; ?>';
                 <span class="label">Motoristas</span>
                 <span class="tooltip">Motoristas</span>
             </a>
+            <a href="carro.php" class="nav-link <?php echo $currentPage === 'carro.php' ? 'active' : ''; ?>">
+                <span class="icon">🚛</span>
+                <span class="label">Carros</span>
+                <span class="tooltip">Carros</span>
+            </a>
             <a href="cliente.php" class="nav-link <?php echo $currentPage === 'cliente.php' ? 'active' : ''; ?>">
                 <span class="icon">👥</span>
                 <span class="label">Clientes</span>
@@ -668,6 +677,34 @@ var VT_TEXTO     = '<?php echo EMPRESA_COR_TEXTO; ?>';
                 <span class="tooltip">Usuários</span>
             </a>
             <?php endif; ?>
+        </div>
+
+        <!-- Cadastros Gerais Submenu -->
+        <button class="nav-submenu-toggle <?php echo $isCadastrosGeraisPage ? 'open active' : ''; ?>" id="cadastrosGeraisToggle">
+            <span class="icon">🗂️</span>
+            <span class="label">Cadastros Gerais</span>
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+            <span class="tooltip">Cadastros Gerais</span>
+        </button>
+        <div class="nav-submenu <?php echo $isCadastrosGeraisPage ? 'open' : ''; ?>" id="cadastrosGeraisSubmenu">
+            <a href="remessa_situacao.php" class="nav-link <?php echo $currentPage === 'remessa_situacao.php' ? 'active' : ''; ?>">
+                <span class="icon">📋</span>
+                <span class="label">Situação Remessa</span>
+                <span class="tooltip">Situação Remessa</span>
+            </a>
+            <a href="cidade.php" class="nav-link <?php echo $currentPage === 'cidade.php' ? 'active' : ''; ?>">
+                <span class="icon">🏙️</span>
+                <span class="label">Cidades</span>
+                <span class="tooltip">Cidades</span>
+            </a>
+            <a href="forma_pagamento.php" class="nav-link <?php echo $currentPage === 'forma_pagamento.php' ? 'active' : ''; ?>">
+                <span class="icon">💳</span>
+                <span class="label">Forma de Pagamento</span>
+                <span class="tooltip">Forma de Pagamento</span>
+            </a>
         </div>
 
         <!-- Viagens Submenu -->

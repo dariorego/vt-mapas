@@ -170,7 +170,7 @@ if (isset($_GET['logout'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Entregas - Victor Transportes</title>
+    <title>Entregas - <?php echo EMPRESA_NOME; ?></title>
     <style>
         :root {
             --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>;

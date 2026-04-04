@@ -49,6 +49,15 @@ $allCards = [
         'ordem' => 4,
         'admin_only' => false
     ],
+    'carros' => [
+        'titulo' => 'Carros',
+        'descricao' => 'Cadastro e gestão da frota de veículos.',
+        'icone' => '🚛',
+        'link' => 'carro.php',
+        'cor' => '#6366F1',
+        'ordem' => 4.5,
+        'admin_only' => false
+    ],
     'viagens' => [
         'titulo' => 'Relação de Viagem',
         'descricao' => 'Acompanhe viagens, atribua motoristas e controle entregas.',
@@ -146,7 +155,7 @@ $savedConfig = loadCardConfig($configFile);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Configurações - Victor Transportes</title>
+    <title>Configurações - <?php echo EMPRESA_NOME; ?></title>
     <style>
         :root {
             --primary: #1F6F54; --primary-light: #2F8F6B; --primary-bg: #E8F4EF;

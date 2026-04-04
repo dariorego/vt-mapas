@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Motorista - Victor Transportes</title>
+    <title>Motorista - <?php echo EMPRESA_NOME; ?></title>
     <style>
         :root {
             --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>;
@@ -198,7 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="card">
         <div class="card-header">
             <div class="logo">🚚</div>
-            <h1>Victor Transportes</h1>
+            <h1><?php echo EMPRESA_NOME; ?></h1>
             <p>Área do Motorista</p>
         </div>
         <div class="card-body">
@@ -227,7 +227,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <button type="submit" class="btn-login">Entrar</button>
             </form>
 
-            <p class="footer">© 2026 Victor Transportes</p>
+            <p class="footer">© 2026 <?php echo EMPRESA_NOME; ?></p>
         </div>
     </div>
 

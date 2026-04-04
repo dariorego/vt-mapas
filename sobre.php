@@ -34,7 +34,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sobre - Victor Transportes</title>
+    <title>Sobre - <?php echo EMPRESA_NOME; ?></title>
     <?php $currentPage = 'sobre.php'; ?>
     <style>
         :root {
@@ -232,7 +232,7 @@ try {
             </div>
 
             <div class="copyright">
-                <p>© 2026 Victor Transportes</p>
+                <p>© 2026 <?php echo EMPRESA_NOME; ?></p>
                 <p>Todos os direitos reservados</p>
                  <p>Versão 29//2026 - 2350</p>
             </div>

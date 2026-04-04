@@ -23,6 +23,12 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
         $limit  = max(1, min(200, (int) ($_GET['limit']  ?? 25)));
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
 
+        $filtroDatas      = isset($_GET['datas'])      && is_array($_GET['datas'])      ? array_filter($_GET['datas'])      : [];
+        $filtroSituacoes  = isset($_GET['situacoes'])  && is_array($_GET['situacoes'])  ? array_filter($_GET['situacoes'])  : [];
+        $filtroMotoristas = isset($_GET['motoristas']) && is_array($_GET['motoristas']) ? array_filter($_GET['motoristas']) : [];
+        $filtroCarros     = isset($_GET['carros'])     && is_array($_GET['carros'])     ? array_filter($_GET['carros'])     : [];
+        $filtroFormas     = isset($_GET['formas'])     && is_array($_GET['formas'])     ? array_filter($_GET['formas'])     : [];
+
         $params = [];
         $where  = "FROM v_remessa WHERE remessa_cliente_id NOT IN (120,197)";
 
@@ -31,6 +37,31 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
             $params[':s1'] = "%{$search}%";
             $params[':s2'] = "%{$search}%";
             $params[':s3'] = "%{$search}%";
+        }
+        if (!empty($filtroDatas)) {
+            $ph = implode(',', array_fill(0, count($filtroDatas), '?'));
+            $where .= " AND DATE(remessa_data_remessa) IN ({$ph})";
+            foreach ($filtroDatas as $d) $params[] = $d;
+        }
+        if (!empty($filtroSituacoes)) {
+            $ph = implode(',', array_fill(0, count($filtroSituacoes), '?'));
+            $where .= " AND COALESCE(remessa_situacao_descricao,'Sem situação') IN ({$ph})";
+            foreach ($filtroSituacoes as $v) $params[] = $v;
+        }
+        if (!empty($filtroMotoristas)) {
+            $ph = implode(',', array_fill(0, count($filtroMotoristas), '?'));
+            $where .= " AND COALESCE(motorista_nome,'Sem motorista') IN ({$ph})";
+            foreach ($filtroMotoristas as $v) $params[] = $v;
+        }
+        if (!empty($filtroCarros)) {
+            $ph = implode(',', array_fill(0, count($filtroCarros), '?'));
+            $where .= " AND COALESCE(carro_descricao,'Sem carro') IN ({$ph})";
+            foreach ($filtroCarros as $v) $params[] = $v;
+        }
+        if (!empty($filtroFormas)) {
+            $ph = implode(',', array_fill(0, count($filtroFormas), '?'));
+            $where .= " AND COALESCE(forma_pgto_descricao,'Sem forma') IN ({$ph})";
+            foreach ($filtroFormas as $v) $params[] = $v;
         }
 
         $total = (int) $db->queryOne("SELECT COUNT(*) as n {$where}", $params)['n'];
@@ -71,6 +102,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'get') {
         // Get coordinates from remessa table
         $coords = $db->queryOne("SELECT latitude, longitude, coordenadas FROM remessa WHERE id = ?", [$id]);
         if ($coords) { $pedido['latitude'] = $coords['latitude']; $pedido['longitude'] = $coords['longitude']; $pedido['coordenadas'] = $coords['coordenadas']; }
+        // Get cidade_nome via cliente
+        $cidadeRow = $db->queryOne("SELECT ci.id as cidade_id, ci.descricao as cidade_nome FROM cliente c LEFT JOIN cidade ci ON ci.id = c.cidade_id WHERE c.id = ?", [$pedido['remessa_cliente_id']]);
+        if ($cidadeRow) { $pedido['cliente_cidade_id'] = $cidadeRow['cidade_id']; $pedido['cidade_nome'] = $cidadeRow['cidade_nome']; }
         echo json_encode(['success' => true, 'data' => $pedido]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -85,7 +119,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'viagens') {
         $viagens = $db->query("SELECT v.id, v.data_viagem, m.nome as motorista_nome, c.descricao as carro_descricao
             FROM viagem v LEFT JOIN motorista m ON m.id = v.motorista_id
             LEFT JOIN carro c ON c.id = m.carro_id
-            ORDER BY v.data_viagem DESC LIMIT 100");
+            ORDER BY v.id DESC LIMIT 200");
         echo json_encode(['success' => true, 'data' => $viagens]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -99,15 +133,33 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'clientes') {
     try {
         $search = $_GET['search'] ?? '';
         $params = [];
-        $sql = "SELECT id, nome, fone, endereco, coordenadas, latitude, longitude FROM cliente WHERE id NOT IN (120,197)";
+        $sql = "SELECT c.id, c.nome, c.fone, c.endereco, c.coordenadas, c.latitude, c.longitude, c.cidade_id, ci.descricao as cidade_nome FROM cliente c LEFT JOIN cidade ci ON ci.id = c.cidade_id WHERE c.id NOT IN (120,197)";
         if (!empty($search)) {
-            $sql .= " AND (nome LIKE :s1 OR CAST(id AS CHAR) LIKE :s2)";
+            $sql .= " AND (nome LIKE :s1 OR CAST(id AS CHAR) LIKE :s2 OR fone LIKE :s3)";
             $params[':s1'] = "%{$search}%";
             $params[':s2'] = "%{$search}%";
+            $params[':s3'] = "%{$search}%";
         }
-        $sql .= " ORDER BY nome LIMIT 50";
+        $sql .= " ORDER BY nome LIMIT 80";
         $clientes = $db->query($sql, $params);
         echo json_encode(['success' => true, 'data' => $clientes]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// AJAX: Valores de pacote por cidade
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'cidade_valores') {
+    header('Content-Type: application/json');
+    try {
+        $cidade_id = intval($_GET['cidade_id'] ?? 0);
+        if (!$cidade_id) throw new Exception('cidade_id inválido');
+        $valores = $db->query(
+            "SELECT CAST(qde AS UNSIGNED) as qde, valor FROM cidade_valores WHERE cidade_id = ? AND tipo = 'p' ORDER BY qde ASC",
+            [$cidade_id]
+        );
+        echo json_encode(['success' => true, 'data' => $valores]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
@@ -130,10 +182,124 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'situacoes') {
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'formas_pgto') {
     header('Content-Type: application/json');
     try {
-        $fp = $db->query("SELECT id, descricao FROM forma_pgto ORDER BY descricao");
+        // Tenta forma_pagamento, fallback para forma_pgto
+        try {
+            $fp = $db->query("SELECT id, descricao FROM forma_pagamento ORDER BY descricao");
+        } catch (Exception $e2) {
+            $fp = $db->query("SELECT id, descricao FROM forma_pgto ORDER BY descricao");
+        }
         echo json_encode(['success' => true, 'data' => $fp]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// AJAX: Resumo dos cards de totais
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'resumo') {
+    header('Content-Type: application/json');
+    try {
+        $filtroDatas      = isset($_GET['datas'])      && is_array($_GET['datas'])      ? array_filter($_GET['datas'])      : [];
+        $filtroSituacoes  = isset($_GET['situacoes'])  && is_array($_GET['situacoes'])  ? array_filter($_GET['situacoes'])  : [];
+        $filtroMotoristas = isset($_GET['motoristas']) && is_array($_GET['motoristas']) ? array_filter($_GET['motoristas']) : [];
+        $filtroCarros     = isset($_GET['carros'])     && is_array($_GET['carros'])     ? array_filter($_GET['carros'])     : [];
+        $filtroFormas     = isset($_GET['formas'])     && is_array($_GET['formas'])     ? array_filter($_GET['formas'])     : [];
+        $params = [];
+        $where  = "FROM v_remessa WHERE remessa_cliente_id NOT IN (120,197)";
+        if (!empty($filtroDatas)) {
+            $ph = implode(',', array_fill(0, count($filtroDatas), '?'));
+            $where .= " AND DATE(remessa_data_remessa) IN ({$ph})";
+            foreach ($filtroDatas as $d) $params[] = $d;
+        }
+        if (!empty($filtroSituacoes)) {
+            $ph = implode(',', array_fill(0, count($filtroSituacoes), '?'));
+            $where .= " AND COALESCE(remessa_situacao_descricao,'Sem situação') IN ({$ph})";
+            foreach ($filtroSituacoes as $v) $params[] = $v;
+        }
+        if (!empty($filtroMotoristas)) {
+            $ph = implode(',', array_fill(0, count($filtroMotoristas), '?'));
+            $where .= " AND COALESCE(motorista_nome,'Sem motorista') IN ({$ph})";
+            foreach ($filtroMotoristas as $v) $params[] = $v;
+        }
+        if (!empty($filtroCarros)) {
+            $ph = implode(',', array_fill(0, count($filtroCarros), '?'));
+            $where .= " AND COALESCE(carro_descricao,'Sem carro') IN ({$ph})";
+            foreach ($filtroCarros as $v) $params[] = $v;
+        }
+        if (!empty($filtroFormas)) {
+            $ph = implode(',', array_fill(0, count($filtroFormas), '?'));
+            $where .= " AND COALESCE(forma_pgto_descricao,'Sem forma') IN ({$ph})";
+            foreach ($filtroFormas as $v) $params[] = $v;
+        }
+        $row = $db->queryOne("SELECT
+            COALESCE(SUM(remessa_pacote_qde),0)                                                          as total_pacotes,
+            COALESCE(SUM(CASE WHEN remessa_situacao_descricao = 'Entregue' THEN 1 ELSE 0 END),0)         as total_entregues,
+            COALESCE(SUM(CASE WHEN remessa_situacao_descricao = 'Fornecedor não entregou' THEN 1 ELSE 0 END),0) as total_nao_entregue_forn,
+            COALESCE(SUM(remessa_total),0)                                                               as valor_total
+            {$where}", $params);
+        echo json_encode(['success' => true, 'data' => $row]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// AJAX: Facetas para filtros laterais (cross-filter: cada faceta exclui seu próprio filtro)
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'filtros') {
+    header('Content-Type: application/json');
+    try {
+        $filtroDatas      = isset($_GET['datas'])      && is_array($_GET['datas'])      ? array_filter($_GET['datas'])      : [];
+        $filtroSituacoes  = isset($_GET['situacoes'])  && is_array($_GET['situacoes'])  ? array_filter($_GET['situacoes'])  : [];
+        $filtroMotoristas = isset($_GET['motoristas']) && is_array($_GET['motoristas']) ? array_filter($_GET['motoristas']) : [];
+        $filtroCarros     = isset($_GET['carros'])     && is_array($_GET['carros'])     ? array_filter($_GET['carros'])     : [];
+        $filtroFormas     = isset($_GET['formas'])     && is_array($_GET['formas'])     ? array_filter($_GET['formas'])     : [];
+
+        // Monta WHERE excluindo a própria faceta (para manter opções visíveis com contagens filtradas)
+        $buildWhere = function(string $exclude) use ($filtroDatas,$filtroSituacoes,$filtroMotoristas,$filtroCarros,$filtroFormas): array {
+            $params = [];
+            $w = "FROM v_remessa WHERE remessa_cliente_id NOT IN (120,197)";
+            if ($exclude !== 'data' && !empty($filtroDatas)) {
+                $ph = implode(',', array_fill(0, count($filtroDatas), '?'));
+                $w .= " AND DATE(remessa_data_remessa) IN ({$ph})";
+                foreach ($filtroDatas as $d) $params[] = $d;
+            }
+            if ($exclude !== 'situacao' && !empty($filtroSituacoes)) {
+                $ph = implode(',', array_fill(0, count($filtroSituacoes), '?'));
+                $w .= " AND COALESCE(remessa_situacao_descricao,'Sem situação') IN ({$ph})";
+                foreach ($filtroSituacoes as $v) $params[] = $v;
+            }
+            if ($exclude !== 'motorista' && !empty($filtroMotoristas)) {
+                $ph = implode(',', array_fill(0, count($filtroMotoristas), '?'));
+                $w .= " AND COALESCE(motorista_nome,'Sem motorista') IN ({$ph})";
+                foreach ($filtroMotoristas as $v) $params[] = $v;
+            }
+            if ($exclude !== 'carro' && !empty($filtroCarros)) {
+                $ph = implode(',', array_fill(0, count($filtroCarros), '?'));
+                $w .= " AND COALESCE(carro_descricao,'Sem carro') IN ({$ph})";
+                foreach ($filtroCarros as $v) $params[] = $v;
+            }
+            if ($exclude !== 'forma' && !empty($filtroFormas)) {
+                $ph = implode(',', array_fill(0, count($filtroFormas), '?'));
+                $w .= " AND COALESCE(forma_pgto_descricao,'Sem forma') IN ({$ph})";
+                foreach ($filtroFormas as $v) $params[] = $v;
+            }
+            return [$w, $params];
+        };
+
+        [$wD,$pD] = $buildWhere('data');
+        [$wS,$pS] = $buildWhere('situacao');
+        [$wM,$pM] = $buildWhere('motorista');
+        [$wC,$pC] = $buildWhere('carro');
+        [$wF,$pF] = $buildWhere('forma');
+
+        $datas     = $db->query("SELECT DATE(remessa_data_remessa) as valor, COUNT(*) as total {$wD} AND remessa_data_remessa IS NOT NULL GROUP BY DATE(remessa_data_remessa) ORDER BY valor DESC LIMIT 60", $pD);
+        $situacoes = $db->query("SELECT COALESCE(remessa_situacao_descricao,'Sem situação') as valor, COUNT(*) as total {$wS} GROUP BY remessa_situacao_descricao ORDER BY total DESC", $pS);
+        $motoristas= $db->query("SELECT COALESCE(motorista_nome,'Sem motorista') as valor, COUNT(*) as total {$wM} GROUP BY motorista_nome ORDER BY total DESC LIMIT 30", $pM);
+        $carros    = $db->query("SELECT COALESCE(carro_descricao,'Sem carro') as valor, COUNT(*) as total {$wC} GROUP BY carro_descricao ORDER BY total DESC LIMIT 20", $pC);
+        $formas    = $db->query("SELECT COALESCE(forma_pgto_descricao,'Sem forma') as valor, COUNT(*) as total {$wF} GROUP BY forma_pgto_descricao ORDER BY total DESC", $pF);
+        echo json_encode(['success'=>true,'datas'=>$datas,'situacoes'=>$situacoes,'motoristas'=>$motoristas,'carros'=>$carros,'formas'=>$formas]);
+    } catch (Exception $e) {
+        echo json_encode(['success'=>false,'error'=>$e->getMessage()]);
     }
     exit;
 }
@@ -242,13 +408,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     }
     exit;
 }
+// Pré-carregar formas de pagamento para injetar direto no JS
+try {
+    $formasPgtoPreload = $db->query("SELECT id, descricao FROM forma_pagamento ORDER BY descricao");
+} catch (Exception $e) {
+    $formasPgtoPreload = [];
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pedidos - Victor Transportes</title>
+    <title>Pedidos - <?php echo EMPRESA_NOME; ?></title>
     <style>
         :root {
             --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>; --primary-light: <?php echo EMPRESA_COR_PRIMARIA; ?>; --primary-bg: <?php echo EMPRESA_COR_PRIMARIA; ?>1a;
@@ -349,12 +521,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         .modal-footer { padding:16px 24px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:12px; }
 
         /* Client search */
-        .client-search-results { position:absolute; z-index:100; background:white; border:1px solid var(--border); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); max-height:200px; overflow-y:auto; width:100%; display:none; }
+        .client-search-results { position:absolute; z-index:500; background:white; border:1px solid var(--border); border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.15); max-height:300px; overflow-y:auto; width:100%; display:none; top:100%; left:0; }
         .client-search-results.active { display:block; }
         .client-search-item { padding:8px 12px; cursor:pointer; font-size:0.85rem; border-bottom:1px solid #f0f0f0; }
         .client-search-item:hover { background:var(--primary-bg); }
         .client-search-item .name { font-weight:600; }
         .client-search-item .detail { font-size:0.75rem; color:var(--text-muted); }
+
+        /* Cards de resumo */
+        .resumo-cards { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px; }
+        .resumo-card { background:var(--card); border-radius:10px; box-shadow:0 1px 6px rgba(0,0,0,0.08); padding:14px 16px; display:flex; align-items:center; gap:12px; border-left:4px solid var(--primary); }
+        .resumo-icon { font-size:1.6rem; line-height:1; }
+        .resumo-valor { font-size:1.4rem; font-weight:700; color:var(--primary); line-height:1.1; }
+        .resumo-label { font-size:0.72rem; color:#888; font-weight:600; text-transform:uppercase; letter-spacing:0.3px; margin-top:2px; }
+        @media(max-width:900px){ .resumo-cards { grid-template-columns:repeat(2,1fr); } }
+        @media(max-width:540px){ .resumo-cards { grid-template-columns:1fr 1fr; } }
+
+        /* Layout lateral */
+        .page-layout { display:flex; gap:14px; align-items:flex-start; }
+        .page-main   { flex:1; min-width:0; }
+
+        /* Painel de filtros */
+        .filter-panel { width:210px; flex-shrink:0; display:flex; flex-direction:column; gap:8px; position:sticky; top:20px; }
+        .fp-group { background:var(--card); border-radius:10px; box-shadow:0 1px 6px rgba(0,0,0,0.07); overflow:hidden; }
+        .fp-header { background:var(--primary); color:#fff; padding:8px 12px; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.4px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none; }
+        .fp-header .fp-clear { background:none; border:none; color:rgba(255,255,255,0.8); font-size:1rem; cursor:pointer; padding:0 2px; line-height:1; }
+        .fp-header .fp-clear:hover { color:#fff; }
+        .fp-header .fp-arrow { transition:transform 0.2s; font-style:normal; font-size:0.7rem; }
+        .fp-group.collapsed .fp-arrow { transform:rotate(-90deg); }
+        .fp-group.collapsed .fp-body  { display:none; }
+        .fp-body { padding:4px 0 2px; }
+        .fp-item { display:flex; align-items:center; gap:7px; padding:5px 12px; font-size:0.82rem; cursor:pointer; }
+        .fp-item:hover { background:var(--primary-bg); }
+        .fp-item input[type=checkbox] { accent-color:var(--primary); flex-shrink:0; }
+        .fp-item label { flex:1; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .fp-count { font-size:0.73rem; color:var(--text-muted); white-space:nowrap; }
+        .fp-more { padding:4px 12px; }
+        .fp-more button { background:none; border:none; color:var(--primary); font-size:0.78rem; font-weight:600; cursor:pointer; padding:0; }
+        .fp-apply { padding:6px 10px; border-top:1px solid var(--border); }
+        .fp-apply button { width:100%; padding:6px; background:var(--primary); color:#fff; border:none; border-radius:6px; font-size:0.82rem; font-weight:600; cursor:pointer; }
+        .fp-apply button:hover { opacity:0.9; }
+
+        /* Tags de filtros ativos */
+        .active-filters { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+        .af-tag { display:inline-flex; align-items:center; gap:5px; background:var(--primary); color:#fff; border-radius:20px; padding:3px 10px; font-size:0.78rem; font-weight:600; }
+        .af-tag button { background:none; border:none; color:#fff; cursor:pointer; font-size:1rem; line-height:1; padding:0; opacity:0.8; }
+        .af-tag button:hover { opacity:1; }
+        .af-clear-all { background:none; border:1px solid var(--border); border-radius:20px; padding:3px 10px; font-size:0.78rem; color:var(--text-muted); cursor:pointer; }
+        .af-clear-all:hover { background:#f3f4f6; }
 
         @media (max-width:768px) {
             .main-content { padding:16px; }
@@ -363,6 +577,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             .table-container { overflow-x:auto; }
             table { min-width:800px; }
             .form-grid { grid-template-columns:1fr; }
+            .page-layout { flex-direction:column; }
+            .filter-panel { width:100%; position:static; }
         }
     </style>
 </head>
@@ -376,6 +592,95 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                 <h1>📦 Relatório - Pedidos</h1>
                 <button class="btn btn-primary" onclick="showForm()">➕ Novo Pedido</button>
             </div>
+
+            <!-- Cards de resumo -->
+            <div class="resumo-cards" id="resumoCards">
+                <div class="resumo-card">
+                    <div class="resumo-icon">📦</div>
+                    <div class="resumo-info">
+                        <div class="resumo-valor" id="card-pacotes">—</div>
+                        <div class="resumo-label">Total de Pacotes</div>
+                    </div>
+                </div>
+                <div class="resumo-card">
+                    <div class="resumo-icon">🚫</div>
+                    <div class="resumo-info">
+                        <div class="resumo-valor" id="card-nao-forn">—</div>
+                        <div class="resumo-label">Fornecedor não entregou</div>
+                    </div>
+                </div>
+                <div class="resumo-card">
+                    <div class="resumo-icon">✅</div>
+                    <div class="resumo-info">
+                        <div class="resumo-valor" id="card-entregues">—</div>
+                        <div class="resumo-label">Entregues</div>
+                    </div>
+                </div>
+                <div class="resumo-card">
+                    <div class="resumo-icon">💰</div>
+                    <div class="resumo-info">
+                        <div class="resumo-valor" id="card-valor">—</div>
+                        <div class="resumo-label">Valor Total</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page-layout">
+            <!-- Painel de Filtros -->
+            <div class="filter-panel" id="filterPanel">
+                <!-- DATA PEDIDO -->
+                <div class="fp-group" id="fpg-data">
+                    <div class="fp-header" onclick="toggleFP('fpg-data')">
+                        <span>▼ DATA PEDIDO</span>
+                        <button class="fp-clear" onclick="clearFP('data');event.stopPropagation()" title="Limpar">×</button>
+                    </div>
+                    <div class="fp-body" id="fpb-data"></div>
+                    <div class="fp-more" id="fpm-data" style="display:none"><button onclick="showAllFP('data')">+ Ver todos</button></div>
+                    <div class="fp-apply"><button onclick="applyFilters()">✓ Aplicar</button></div>
+                </div>
+                <!-- SITUAÇÃO PEDIDO -->
+                <div class="fp-group" id="fpg-situacao">
+                    <div class="fp-header" onclick="toggleFP('fpg-situacao')">
+                        <span>▼ SITUAÇÃO PEDIDO</span>
+                        <button class="fp-clear" onclick="clearFP('situacao');event.stopPropagation()" title="Limpar">×</button>
+                    </div>
+                    <div class="fp-body" id="fpb-situacao"></div>
+                    <div class="fp-more" id="fpm-situacao" style="display:none"><button onclick="showAllFP('situacao')">+ Ver todos</button></div>
+                    <div class="fp-apply"><button onclick="applyFilters()">✓ Aplicar</button></div>
+                </div>
+                <!-- NOME MOTORISTA -->
+                <div class="fp-group" id="fpg-motorista">
+                    <div class="fp-header" onclick="toggleFP('fpg-motorista')">
+                        <span>▼ NOME MOTORISTA</span>
+                        <button class="fp-clear" onclick="clearFP('motorista');event.stopPropagation()" title="Limpar">×</button>
+                    </div>
+                    <div class="fp-body" id="fpb-motorista"></div>
+                    <div class="fp-more" id="fpm-motorista" style="display:none"><button onclick="showAllFP('motorista')">+ Ver todos</button></div>
+                    <div class="fp-apply"><button onclick="applyFilters()">✓ Aplicar</button></div>
+                </div>
+                <!-- CARRO -->
+                <div class="fp-group" id="fpg-carro">
+                    <div class="fp-header" onclick="toggleFP('fpg-carro')">
+                        <span>▼ CARRO</span>
+                        <button class="fp-clear" onclick="clearFP('carro');event.stopPropagation()" title="Limpar">×</button>
+                    </div>
+                    <div class="fp-body" id="fpb-carro"></div>
+                    <div class="fp-more" id="fpm-carro" style="display:none"><button onclick="showAllFP('carro')">+ Ver todos</button></div>
+                    <div class="fp-apply"><button onclick="applyFilters()">✓ Aplicar</button></div>
+                </div>
+                <!-- FORMA PGTO -->
+                <div class="fp-group" id="fpg-forma">
+                    <div class="fp-header" onclick="toggleFP('fpg-forma')">
+                        <span>▼ FORMA PGTO</span>
+                        <button class="fp-clear" onclick="clearFP('forma');event.stopPropagation()" title="Limpar">×</button>
+                    </div>
+                    <div class="fp-body" id="fpb-forma"></div>
+                    <div class="fp-more" id="fpm-forma" style="display:none"><button onclick="showAllFP('forma')">+ Ver todos</button></div>
+                    <div class="fp-apply"><button onclick="applyFilters()">✓ Aplicar</button></div>
+                </div>
+            </div><!-- .filter-panel -->
+
+            <div class="page-main">
             <div class="filter-bar">
                 <input type="text" id="searchInput" placeholder="🔍 Buscar por cliente, código ou motorista..." oninput="debounceSearch()">
                 <select id="pageSizeSelect" onchange="onPageSizeChange()" style="padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:0.9rem;">
@@ -384,8 +689,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                     <option value="50">50 / pág</option>
                     <option value="100">100 / pág</option>
                 </select>
-                <button class="btn btn-secondary" onclick="loadPedidos()">🔄 Atualizar</button>
+                <button class="btn btn-secondary" onclick="loadPedidos();loadFilterPanel();loadResumo()">🔄 Atualizar</button>
             </div>
+            <!-- Tags de filtros ativos -->
+            <div class="active-filters" id="activeTags"></div>
             <div class="table-container">
                 <table>
                     <thead><tr>
@@ -404,6 +711,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                 <span id="paginationInfo" style="font-size:0.85rem; color:#666;"></span>
                 <div id="paginationControls" style="display:flex; gap:4px; flex-wrap:wrap;"></div>
             </div>
+            </div><!-- .page-main -->
+            </div><!-- .page-layout -->
         </div>
 
         <!-- FORM VIEW -->
@@ -436,14 +745,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                             <label>Cliente <span class="req">*</span></label>
                             <div class="input-row">
                                 <input type="hidden" id="f_cliente_id">
-                                <input type="text" id="f_cliente_search" placeholder="Buscar cliente..." oninput="searchClientes()" onfocus="searchClientes()" autocomplete="off">
+                                <input type="hidden" id="f_cidade_id">
+                                <input type="text" id="f_cliente_search" placeholder="🔍 Digite o nome do cliente..." oninput="searchClientes()" onfocus="searchClientes()" autocomplete="off">
                                 <button type="button" class="btn btn-sm btn-outline" onclick="searchClientes()">🔍 Buscar</button>
                             </div>
                             <div class="client-search-results" id="clienteResults"></div>
                         </div>
                         <div class="form-group">
-                            <label>Descrição</label>
-                            <input type="text" id="f_descricao">
+                            <label>Cidade</label>
+                            <input type="text" id="f_cidade_nome" readonly placeholder="Preenchido automaticamente" style="background:#f5f5f5;cursor:default;">
                         </div>
                     </div>
                     <div class="form-grid" style="margin-top:12px;">
@@ -464,10 +774,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
 
                     <div class="section-title">Valores Totais</div>
                     <div class="form-grid">
-                        <div class="form-group"><label>Qde Pacote</label><input type="number" id="f_pacote_qde" min="0" value="0"></div>
-                        <div class="form-group"><label>Valor Pacote</label><input type="number" id="f_pacote_valor" step="0.01" min="0" value="0"></div>
+                        <div class="form-group"><label>Qde Pacote</label><input type="number" id="f_pacote_qde" min="0" value="0" oninput="onQdePacoteChange()"></div>
+                        <div class="form-group"><label>Valor Pacote</label><input type="number" id="f_pacote_valor" step="0.01" min="0" value="0" oninput="calcTotal()"></div>
                         <div class="form-group"><label>Total</label><input type="number" id="f_total" step="0.01" min="0" value="0"></div>
-                        <div class="form-group"><label>Outros Valores</label><input type="number" id="f_outros_valores" step="0.01" min="0" value="0"></div>
+                        <div class="form-group"><label>Outros Valores</label><input type="number" id="f_outros_valores" step="0.01" min="0" value="0" oninput="calcTotal()"></div>
                     </div>
 
                     <div class="section-title">Coordenadas</div>
@@ -501,7 +811,156 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     var VT_PRIMARY = '<?php echo EMPRESA_COR_PRIMARIA; ?>';
     var VT_TEXTO   = '<?php echo EMPRESA_COR_TEXTO; ?>';
     let currentSort = 'remessa_id', currentDir = 'DESC', searchTimeout = null, deleteId = null;
+
+    // Estado dos filtros laterais
+    const fpSelected = { data:{}, situacao:{}, motorista:{}, carro:{}, forma:{} };
+    const fpData     = { data:[], situacao:[], motorista:[], carro:[], forma:[] };
+    const FP_LIMIT   = 5;
+
+    async function loadFilterPanel() {
+        try {
+            const res  = await fetch('pedido.php?ajax=filtros' + fpQueryParams());
+            const data = await res.json();
+            if (!data.success) return;
+            fpData.data      = data.datas     || [];
+            fpData.situacao  = data.situacoes || [];
+            fpData.motorista = data.motoristas|| [];
+            fpData.carro     = data.carros    || [];
+            fpData.forma     = data.formas    || [];
+            ['data','situacao','motorista','carro','forma'].forEach(k => renderFP(k));
+        } catch(e) { console.error(e); }
+    }
+
+    function renderFP(key, showAll) {
+        const items = fpData[key];
+        const body  = document.getElementById('fpb-'+key);
+        const more  = document.getElementById('fpm-'+key);
+        if (!body) return;
+        const limit = (showAll || items.length <= FP_LIMIT) ? items.length : FP_LIMIT;
+        const visible = items.slice(0, limit);
+        body.innerHTML = visible.map(item => {
+            const val  = item.valor;
+            const chk  = fpSelected[key][val] ? 'checked' : '';
+            const disp = key === 'data' ? formatDate(val) : val;
+            const safe = val.replace(/"/g,'&quot;');
+            return `<div class="fp-item">
+                <input type="checkbox" id="fp-${key}-${safe}" value="${safe}" ${chk}
+                    onchange="fpToggle('${key}','${safe}',this.checked)">
+                <label for="fp-${key}-${safe}" title="${safe}">${esc(disp)}</label>
+                <span class="fp-count">(${item.total})</span>
+            </div>`;
+        }).join('');
+        if (more) more.style.display = (!showAll && items.length > FP_LIMIT) ? 'block' : 'none';
+    }
+
+    function showAllFP(key) { renderFP(key, true); }
+
+    function fpToggle(key, val, checked) {
+        if (checked) fpSelected[key][val] = true;
+        else delete fpSelected[key][val];
+    }
+
+    function clearFP(key) {
+        fpSelected[key] = {};
+        renderFP(key);
+        applyFilters();
+    }
+
+    function toggleFP(groupId) {
+        document.getElementById(groupId).classList.toggle('collapsed');
+    }
+
+    function applyFilters() {
+        currentPage = 1;
+        renderActiveTags();
+        loadPedidos();
+        loadFilterPanel();
+        loadResumo();
+    }
+
+    async function loadResumo() {
+        try {
+            const res  = await fetch('pedido.php?ajax=resumo' + fpQueryParams());
+            const data = await res.json();
+            if (!data.success) return;
+            const d = data.data;
+            document.getElementById('card-pacotes').textContent  = Number(d.total_pacotes).toLocaleString('pt-BR');
+            document.getElementById('card-nao-forn').textContent = Number(d.total_nao_entregue_forn).toLocaleString('pt-BR');
+            document.getElementById('card-entregues').textContent= Number(d.total_entregues).toLocaleString('pt-BR');
+            document.getElementById('card-valor').textContent    = 'R$ ' + Number(d.valor_total).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+        } catch(e) { console.error(e); }
+    }
+
+    function renderActiveTags() {
+        const labels = { data:'DATA PEDIDO', situacao:'SITUAÇÃO', motorista:'MOTORISTA', carro:'CARRO', forma:'FORMA PGTO' };
+        const container = document.getElementById('activeTags');
+        let html = '';
+        let hasAny = false;
+        Object.entries(fpSelected).forEach(([key, vals]) => {
+            Object.keys(vals).forEach(val => {
+                hasAny = true;
+                const disp = key === 'data' ? formatDate(val) : val;
+                html += `<span class="af-tag">${labels[key]} ${esc(disp)}
+                    <button onclick="removeFPTag('${key}','${val.replace(/'/g,"\\'")}')">×</button></span>`;
+            });
+        });
+        if (hasAny) html += `<button class="af-clear-all" onclick="clearAllFilters()">🧹 Limpar</button>`;
+        container.innerHTML = html;
+    }
+
+    function removeFPTag(key, val) {
+        delete fpSelected[key][val];
+        const cb = document.querySelector(`#fpb-${key} input[value="${val.replace(/"/g,'&quot;')}"]`);
+        if (cb) cb.checked = false;
+        applyFilters();
+    }
+
+    function clearAllFilters() {
+        Object.keys(fpSelected).forEach(k => { fpSelected[k] = {}; renderFP(k); });
+        applyFilters();
+    }
+
+    function fpQueryParams() {
+        let url = '';
+        Object.entries(fpSelected).forEach(([key, vals]) => {
+            Object.keys(vals).forEach(val => { url += `&${key}s[]=${encodeURIComponent(val)}`; });
+        });
+        return url;
+    }
     let viagensCache=[], motoristasCache=[], situacoesCache=[], formasPgtoCache=[];
+    let cidadeValoresCache = []; // [{qde, valor}] sorted ASC
+
+    async function loadCidadeValores(cidadeId) {
+        cidadeValoresCache = [];
+        if (!cidadeId) return;
+        try {
+            const res  = await fetch(`pedido.php?ajax=cidade_valores&cidade_id=${cidadeId}`);
+            const data = await res.json();
+            if (data.success) cidadeValoresCache = data.data;
+        } catch(e) {}
+    }
+
+    function onQdePacoteChange() {
+        const qde = parseInt(document.getElementById('f_pacote_qde').value) || 0;
+        if (qde > 0 && cidadeValoresCache.length) {
+            // Pega o maior tier cujo qde <= quantidade solicitada
+            let pricePerUnit = null;
+            for (const tier of cidadeValoresCache) {
+                if (parseInt(tier.qde) <= qde) pricePerUnit = parseFloat(tier.valor);
+            }
+            if (pricePerUnit !== null) {
+                document.getElementById('f_pacote_valor').value = pricePerUnit.toFixed(2);
+            }
+        }
+        calcTotal();
+    }
+
+    function calcTotal() {
+        const qde    = parseFloat(document.getElementById('f_pacote_qde').value)    || 0;
+        const val    = parseFloat(document.getElementById('f_pacote_valor').value)   || 0;
+        const outros = parseFloat(document.getElementById('f_outros_valores').value) || 0;
+        document.getElementById('f_total').value = (qde * val + outros).toFixed(2);
+    }
 
     // ── Paginação ─────────────────────────────────────────────────────────────
     let currentPage = 1, pageSize = 25, totalItems = 0;
@@ -548,7 +1007,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     }
     // ─────────────────────────────────────────────────────────────────────────
 
-    document.addEventListener('DOMContentLoaded', () => { readUrlParams(); loadPedidos(); loadFormData(); });
+    document.addEventListener('DOMContentLoaded', () => { readUrlParams(); loadPedidos(); loadFormData(); loadFilterPanel(); loadResumo(); });
     document.addEventListener('click', e => { if (!e.target.closest('.form-group')) document.getElementById('clienteResults').classList.remove('active'); });
 
     async function loadFormData() {
@@ -562,7 +1021,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             if(mD.success) { motoristasCache=mD.data; populateSelect('f_motorista_id',mD.data,'id','nome'); }
             if(sD.success) { situacoesCache=sD.data; populateSelect('f_situacao_id',sD.data,'id','descricao'); }
             if(fD.success) { formasPgtoCache=fD.data; populateSelect('f_forma_pgto_id',fD.data,'id','descricao'); }
-        } catch(e) { console.error(e); }
+            else { console.error('Formas pgto:', fD.error); showToast('Erro ao carregar formas de pagamento: ' + (fD.error||''), 'error'); }
+        } catch(e) { console.error(e); showToast('Erro ao carregar dados do formulário', 'error'); }
     }
 
     function populateViagens() {
@@ -576,7 +1036,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
 
     function populateSelect(id, data, valKey, lblKey) {
         const sel = document.getElementById(id);
-        sel.innerHTML = '<option value="">Selecione...</option>' + data.map(d => `<option value="${d[valKey]}">${esc(d[lblKey])}</option>`).join('');
+        if (!sel) return;
+        sel.innerHTML = '<option value="">Selecione...</option>' +
+            data.map(d => `<option value="${d[valKey]}">${String(d[lblKey]).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</option>`).join('');
     }
 
     function onViagemChange() {
@@ -588,27 +1050,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         }
     }
 
+    let clienteSearchTimeout = null;
     async function searchClientes() {
         const q = document.getElementById('f_cliente_search').value;
-        if (q.length < 2) { document.getElementById('clienteResults').classList.remove('active'); return; }
-        try {
-            const res = await fetch(`pedido.php?ajax=clientes&search=${encodeURIComponent(q)}`);
-            const data = await res.json();
-            if (!data.success) return;
-            const el = document.getElementById('clienteResults');
-            el.innerHTML = data.data.map(c => `<div class="client-search-item" onclick="selectCliente(${c.id},'${esc(c.nome)}','${c.latitude||''}','${c.longitude||''}','${esc(c.coordenadas||'')}')">
-                <div class="name">${esc(c.nome)}</div><div class="detail">${esc(c.fone||'')} - ${esc(c.endereco||'')}</div></div>`).join('');
-            el.classList.add('active');
-        } catch(e) { console.error(e); }
+        clearTimeout(clienteSearchTimeout);
+        clienteSearchTimeout = setTimeout(async () => {
+            try {
+                const res  = await fetch(`pedido.php?ajax=clientes&search=${encodeURIComponent(q)}`);
+                const data = await res.json();
+                if (!data.success) return;
+                const el = document.getElementById('clienteResults');
+                if (!data.data.length) {
+                    el.innerHTML = '<div style="padding:10px 14px;color:#888;font-size:0.85rem;">Nenhum cliente encontrado</div>';
+                } else {
+                    el.innerHTML = data.data.map(c => `<div class="client-search-item" onclick="selectCliente(${c.id},'${esc(c.nome)}','${c.latitude||''}','${c.longitude||''}','${esc(c.coordenadas||'')}',${c.cidade_id||0},'${esc(c.cidade_nome||'')}')">
+                        <div class="name">${esc(c.nome)}</div>
+                        <div class="detail">${esc(c.cidade_nome||'')}${c.fone ? ' — '+esc(c.fone) : ''}</div>
+                    </div>`).join('');
+                }
+                el.classList.add('active');
+            } catch(e) { console.error(e); }
+        }, 250);
     }
 
-    function selectCliente(id, nome, lat, lng, coords) {
+    function selectCliente(id, nome, lat, lng, coords, cidadeId, cidadeNome) {
         document.getElementById('f_cliente_id').value = id;
         document.getElementById('f_cliente_search').value = nome;
         document.getElementById('clienteResults').classList.remove('active');
         if (lat) document.getElementById('f_latitude').value = lat;
         if (lng) document.getElementById('f_longitude').value = lng;
         if (coords) document.getElementById('f_coordenadas').value = coords;
+        document.getElementById('f_cidade_id').value = cidadeId || 0;
+        document.getElementById('f_cidade_nome').value = cidadeNome || '';
+        if (cidadeId) loadCidadeValores(cidadeId);
         updateMapLink();
     }
 
@@ -626,7 +1100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         tbody.innerHTML = '<tr><td colspan="7" class="loading">🔄 Carregando...</td></tr>';
         const offset = (currentPage - 1) * pageSize;
         try {
-            const url = `pedido.php?ajax=list&search=${encodeURIComponent(search)}&sort=${currentSort}&dir=${currentDir}&limit=${pageSize}&offset=${offset}`;
+            const url = `pedido.php?ajax=list&search=${encodeURIComponent(search)}&sort=${currentSort}&dir=${currentDir}&limit=${pageSize}&offset=${offset}${fpQueryParams()}`;
             const res  = await fetch(url);
             const data = await res.json();
             if (!data.success) throw new Error(data.error);
@@ -656,10 +1130,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     function updateSortHeaders() { document.querySelectorAll('th[data-sort]').forEach(th => { th.classList.remove('sorted'); const i=th.querySelector('.sort-icon'); if(i) i.textContent='↕'; }); const a=document.querySelector(`th[data-sort="${currentSort}"]`); if(a){a.classList.add('sorted'); const i=a.querySelector('.sort-icon'); if(i) i.textContent=currentDir==='ASC'?'↑':'↓'; } }
     function debounceSearch() { clearTimeout(searchTimeout); searchTimeout=setTimeout(()=>{currentPage=1;loadPedidos();},300); }
 
-    function showForm(id=null) {
+    async function showForm(id=null) {
         document.getElementById('gridView').classList.add('hidden');
         document.getElementById('formView').classList.add('active');
         resetForm();
+        // Garantir que os caches estão carregados antes de popular os selects
+        const fetches = [];
+        if (!motoristasCache.length) fetches.push(fetch('pedido.php?ajax=motoristas').then(r=>r.json()).then(d=>{ if(d.success) motoristasCache=d.data; }));
+        if (!situacoesCache.length)  fetches.push(fetch('pedido.php?ajax=situacoes').then(r=>r.json()).then(d=>{ if(d.success) situacoesCache=d.data; }));
+        if (!formasPgtoCache.length) fetches.push(fetch('pedido.php?ajax=formas_pgto').then(r=>r.json()).then(d=>{ if(d.success) formasPgtoCache=d.data; }));
+        if (!viagensCache.length)    fetches.push(fetch('pedido.php?ajax=viagens').then(r=>r.json()).then(d=>{ if(d.success) viagensCache=d.data; }));
+        if (fetches.length) await Promise.all(fetches);
+        populateSelect('f_motorista_id', motoristasCache, 'id', 'nome');
+        populateSelect('f_situacao_id',  situacoesCache,  'id', 'descricao');
+        populateSelect('f_forma_pgto_id',formasPgtoCache, 'id', 'descricao');
+        populateViagens();
         if (!id) {
             document.getElementById('formHeader').textContent = 'CADASTRAR - PEDIDO';
             document.getElementById('btnExcluir').style.display = 'none';
@@ -670,12 +1155,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         document.getElementById('formView').classList.remove('active');
         document.getElementById('gridView').classList.remove('hidden');
         loadPedidos();
+        loadFilterPanel();
     }
     function resetForm() {
+        cidadeValoresCache = [];
         document.getElementById('pedidoId').value='';
         ['f_viagem_id','f_motorista_id','f_situacao_id','f_forma_pgto_id'].forEach(id=>document.getElementById(id).value='');
-        ['f_cliente_id'].forEach(id=>document.getElementById(id).value='');
-        ['f_cliente_search','f_descricao','f_data_remessa','f_coordenadas','f_latitude','f_longitude'].forEach(id=>document.getElementById(id).value='');
+        ['f_cliente_id','f_cidade_id'].forEach(id=>document.getElementById(id).value='');
+        ['f_cliente_search','f_cidade_nome','f_data_remessa','f_coordenadas','f_latitude','f_longitude'].forEach(id=>document.getElementById(id).value='');
         ['f_pacote_qde','f_pacote_valor','f_total','f_outros_valores'].forEach(id=>document.getElementById(id).value='0');
         updateMapLink();
     }
@@ -693,7 +1180,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             document.getElementById('f_viagem_id').value = p.viagem_id || '';
             document.getElementById('f_motorista_id').value = p.remessa_motorista_id || '';
             document.getElementById('f_cliente_id').value = p.remessa_cliente_id || '';
+            document.getElementById('f_cidade_id').value = p.cliente_cidade_id || 0;
+            document.getElementById('f_cidade_nome').value = p.cidade_nome || '';
             document.getElementById('f_cliente_search').value = p.cliente_nome || '';
+            if (p.cliente_cidade_id) loadCidadeValores(p.cliente_cidade_id);
             document.getElementById('f_descricao').value = p.remessa_descricao || '';
             document.getElementById('f_situacao_id').value = p.remessa_remessa_situacao_id || '';
             document.getElementById('f_forma_pgto_id').value = p.remessa_forma_pagamento_id || '';
@@ -719,7 +1209,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         fd.append('motorista_id', document.getElementById('f_motorista_id').value);
         fd.append('remessa_situacao_id', document.getElementById('f_situacao_id').value);
         fd.append('forma_pagamento_id', document.getElementById('f_forma_pgto_id').value);
-        fd.append('descricao', document.getElementById('f_descricao').value);
+        fd.append('descricao', document.getElementById('f_cidade_nome').value);
         fd.append('data_remessa', document.getElementById('f_data_remessa').value);
         fd.append('pacote_qde', document.getElementById('f_pacote_qde').value);
         fd.append('pacote_valor', document.getElementById('f_pacote_valor').value);

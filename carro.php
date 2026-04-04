@@ -1,6 +1,6 @@
 <?php
 /**
- * CRUD de Motoristas
+ * CRUD de Carros
  * Victor Transportes - Sistema de Gestão
  */
 
@@ -14,49 +14,59 @@ require_once 'config.php';
 require_once 'Database.php';
 
 $db = new Database();
-$currentPage = 'motorista.php';
+$currentPage = 'carro.php';
 
-// AJAX: Listar motoristas
+// AJAX: Listar carros
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
     header('Content-Type: application/json');
     try {
         $search = $_GET['search'] ?? '';
-        $sortCol = $_GET['sort'] ?? 'nome';
+        $sortCol = $_GET['sort'] ?? 'descricao';
         $sortDir = strtoupper($_GET['dir'] ?? 'ASC') === 'DESC' ? 'DESC' : 'ASC';
 
         // Validar coluna de ordenação
-        $allowedCols = ['id', 'nome', 'fone', 'situacao', 'usuario'];
+        $allowedCols = ['id', 'descricao', 'placa', 'situacao'];
         if (!in_array($sortCol, $allowedCols))
-            $sortCol = 'nome';
+            $sortCol = 'descricao';
 
         $limit  = max(1, min(200, (int) ($_GET['limit']  ?? 25)));
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
-        $where = "WHERE 1=1";
+
         $params = [];
+        $where  = "FROM carro WHERE 1=1";
+
         if (!empty($search)) {
-            $where .= " AND (m.nome LIKE :search OR c.placa LIKE :search OR c.descricao LIKE :search)";
+            $where .= " AND (descricao LIKE :search OR placa LIKE :search)";
             $params[':search'] = "%{$search}%";
         }
 
-        $totalCountSql = "SELECT COUNT(*) as n FROM motorista m LEFT JOIN carro c ON m.carro_id = c.id {$where}";
-        $totalResult = $db->queryOne($totalCountSql, $params);
+        $totalResult = $db->queryOne("SELECT COUNT(*) as n {$where}", $params);
         $total = ($totalResult) ? (int)$totalResult['n'] : 0;
 
-        $sql = "SELECT m.id, m.nome, m.situacao, m.fone, m.carro_id, m.usuario, m.latitude, m.longitude, c.descricao as carro_nome, c.placa as carro_placa
-                FROM motorista m 
-                LEFT JOIN carro c ON m.carro_id = c.id
-                {$where}
-                ORDER BY m.{$sortCol} {$sortDir} LIMIT {$limit} OFFSET {$offset}";
+        $sql = "SELECT id, descricao, placa, situacao
+                {$where} ORDER BY {$sortCol} {$sortDir} LIMIT {$limit} OFFSET {$offset}";
 
-        $motoristas = $db->query($sql, $params);
-        echo json_encode(['success' => true, 'data' => $motoristas, 'total' => $total]);
+        $carros = $db->query($sql, $params);
+        echo json_encode(['success' => true, 'data' => $carros, 'total' => $total]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
     exit;
 }
 
-// AJAX: Buscar motorista por ID
+// AJAX: Listar carros ativos (para dropdown)
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'list_active') {
+    header('Content-Type: application/json');
+    try {
+        $carros = $db->query("SELECT id, descricao, placa FROM carro WHERE situacao = 'a' ORDER BY descricao ASC");
+        echo json_encode(['success' => true, 'data' => $carros]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// AJAX: Buscar carro por ID
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'get') {
     header('Content-Type: application/json');
     try {
@@ -64,51 +74,42 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'get') {
         if (!$id)
             throw new Exception('ID inválido');
 
-        $motorista = $db->queryOne("SELECT id, nome, situacao, fone, carro_id, usuario, latitude, longitude
-                                    FROM motorista WHERE id = ?", [$id]);
-        if (!$motorista)
-            throw new Exception('Motorista não encontrado');
+        $carro = $db->queryOne("SELECT id, descricao, placa, situacao FROM carro WHERE id = ?", [$id]);
+        if (!$carro)
+            throw new Exception('Carro não encontrado');
 
-        echo json_encode(['success' => true, 'data' => $motorista]);
+        echo json_encode(['success' => true, 'data' => $carro]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
     exit;
 }
 
-// AJAX: Criar motorista
+// AJAX: Criar carro
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['ajax'] === 'create') {
     header('Content-Type: application/json');
     try {
-        $nome = trim($_POST['nome'] ?? '');
-        $fone = trim($_POST['fone'] ?? '');
-        $usuario = trim($_POST['usuario'] ?? '');
-        $senha = trim($_POST['senha'] ?? '');
+        $descricao = trim($_POST['descricao'] ?? '');
+        $placa = trim($_POST['placa'] ?? '');
         $situacao = trim($_POST['situacao'] ?? 'a');
-        $carro_id = !empty($_POST['carro_id']) ? intval($_POST['carro_id']) : null;
 
-        if (empty($nome))
-            throw new Exception('Nome é obrigatório');
+        if (empty($descricao))
+            throw new Exception('Descrição é obrigatória');
+        if (empty($placa))
+            throw new Exception('Placa é obrigatória');
 
-        $latitude = trim($_POST['latitude'] ?? '');
-        $longitude = trim($_POST['longitude'] ?? '');
-        $latitude = $latitude !== '' ? floatval($latitude) : null;
-        $longitude = $longitude !== '' ? floatval($longitude) : null;
-
-        $sql = "INSERT INTO motorista (nome, fone, usuario, senha, situacao, latitude, longitude, carro_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-        $senhaHash = !empty($senha) ? password_hash($senha, PASSWORD_DEFAULT) : '';
-
-        $db->execute($sql, [$nome, $fone, $usuario, $senhaHash, $situacao, $latitude, $longitude, $carro_id]);
+        $sql = "INSERT INTO carro (descricao, placa, situacao) VALUES (?, ?, ?)";
+        $db->execute($sql, [$descricao, $placa, $situacao]);
         $newId = $db->lastInsertId();
 
-        echo json_encode(['success' => true, 'message' => 'Motorista criado com sucesso!', 'id' => $newId]);
+        echo json_encode(['success' => true, 'message' => 'Carro criado com sucesso!', 'id' => $newId]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
     exit;
 }
 
-// AJAX: Atualizar motorista
+// AJAX: Atualizar carro
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['ajax'] === 'update') {
     header('Content-Type: application/json');
     try {
@@ -116,38 +117,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         if (!$id)
             throw new Exception('ID inválido');
 
-        $nome = trim($_POST['nome'] ?? '');
-        $fone = trim($_POST['fone'] ?? '');
-        $usuario = trim($_POST['usuario'] ?? '');
-        $senha = trim($_POST['senha'] ?? '');
+        $descricao = trim($_POST['descricao'] ?? '');
+        $placa = trim($_POST['placa'] ?? '');
         $situacao = trim($_POST['situacao'] ?? 'a');
 
-        if (empty($nome))
-            throw new Exception('Nome é obrigatório');
+        if (empty($descricao))
+            throw new Exception('Descrição é obrigatória');
+        if (empty($placa))
+            throw new Exception('Placa é obrigatória');
 
-        $latitude = trim($_POST['latitude'] ?? '');
-        $longitude = trim($_POST['longitude'] ?? '');
-        $latitude = $latitude !== '' ? floatval($latitude) : null;
-        $longitude = $longitude !== '' ? floatval($longitude) : null;
-        $carro_id = !empty($_POST['carro_id']) ? intval($_POST['carro_id']) : null;
+        $sql = "UPDATE carro SET descricao = ?, placa = ?, situacao = ? WHERE id = ?";
+        $db->execute($sql, [$descricao, $placa, $situacao, $id]);
 
-        if (!empty($senha)) {
-            $sql = "UPDATE motorista SET nome = ?, fone = ?, usuario = ?, senha = ?, situacao = ?, latitude = ?, longitude = ?, carro_id = ? WHERE id = ?";
-            $senhaHash = password_hash($senha, PASSWORD_DEFAULT);
-            $db->execute($sql, [$nome, $fone, $usuario, $senhaHash, $situacao, $latitude, $longitude, $carro_id, $id]);
-        } else {
-            $sql = "UPDATE motorista SET nome = ?, fone = ?, usuario = ?, situacao = ?, latitude = ?, longitude = ?, carro_id = ? WHERE id = ?";
-            $db->execute($sql, [$nome, $fone, $usuario, $situacao, $latitude, $longitude, $carro_id, $id]);
-        }
-
-        echo json_encode(['success' => true, 'message' => 'Motorista atualizado com sucesso!']);
+        echo json_encode(['success' => true, 'message' => 'Carro atualizado com sucesso!']);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
     exit;
 }
 
-// AJAX: Deletar motorista (soft delete - mudar situação)
+// AJAX: Deletar carro (soft delete - mudar situação)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['ajax'] === 'delete') {
     header('Content-Type: application/json');
     try {
@@ -156,9 +145,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             throw new Exception('ID inválido');
 
         // Soft delete - apenas inativa
-        $db->execute("UPDATE motorista SET situacao = 'i' WHERE id = ?", [$id]);
+        $db->execute("UPDATE carro SET situacao = 'i' WHERE id = ?", [$id]);
 
-        echo json_encode(['success' => true, 'message' => 'Motorista inativado com sucesso!']);
+        echo json_encode(['success' => true, 'message' => 'Carro inativado com sucesso!']);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
@@ -171,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Motoristas - <?php echo EMPRESA_NOME; ?></title>
+    <title>Carros - Victor Transportes</title>
     <style>
         :root {
             --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>;
@@ -201,13 +190,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             min-height: 100vh;
         }
 
-        /* Main Container */
         .main-content {
             padding: 20px;
             width: 100%;
         }
 
-        /* Page Header */
         .page-header {
             display: flex;
             justify-content: space-between;
@@ -246,6 +233,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
 
         .btn-primary:hover {
             background: var(--primary-light);
+            filter: brightness(1.1);
         }
 
         .btn-secondary {
@@ -258,12 +246,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             color: white;
         }
 
-        .btn-sm {
-            padding: 6px 12px;
-            font-size: 0.8rem;
-        }
-
-        /* Filter Bar */
         .filter-bar {
             background: var(--card);
             padding: 16px;
@@ -291,7 +273,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             box-shadow: 0 0 0 3px rgba(31, 111, 84, 0.1);
         }
 
-        /* Table Container */
         .table-container {
             background: var(--card);
             border-radius: 12px;
@@ -328,7 +309,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             background: #f8f9fa;
         }
 
-        /* Status Badge */
         .badge {
             display: inline-block;
             padding: 4px 10px;
@@ -347,7 +327,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             color: #991b1b;
         }
 
-        /* Actions */
         .actions {
             display: flex;
             gap: 8px;
@@ -384,24 +363,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             background: #fecaca;
         }
 
-        .action-btn.map {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .action-btn.map:hover {
-            background: #bbf7d0;
-        }
-
-        .action-btn.whatsapp { background:#dcfce7; color:#166534; text-decoration:none; }
-        .action-btn.whatsapp:hover { background:#bbf7d0; }
-        .action-btn.map.disabled {
-            background: #f3f4f6;
-            color: #9ca3af;
-            cursor: not-allowed;
-        }
-
-        /* Modal */
         .modal-overlay {
             position: fixed;
             inset: 0;
@@ -480,12 +441,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             box-shadow: 0 0 0 3px rgba(31, 111, 84, 0.1);
         }
 
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-        }
-
         .modal-footer {
             padding: 16px 24px;
             border-top: 1px solid var(--border);
@@ -494,7 +449,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             gap: 12px;
         }
 
-        /* Toast */
         .toast {
             position: fixed;
             bottom: 24px;
@@ -514,75 +468,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             opacity: 1;
         }
 
-        .toast.success {
-            background: var(--success);
-        }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
 
-        .toast.error {
-            background: var(--danger);
-        }
-
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: var(--text-muted);
-        }
-
-        .empty-state .icon {
-            font-size: 3rem;
-            margin-bottom: 16px;
-        }
-
-        /* Loading */
         .loading {
             text-align: center;
             padding: 40px;
             color: var(--text-muted);
         }
 
-        /* Responsive */
         @media (max-width: 768px) {
-            .main-content {
-                padding: 16px;
-            }
-
-            .page-header {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .filter-bar {
-                flex-direction: column;
-            }
-
-            .filter-bar input {
-                width: 100%;
-            }
-
-            .table-container {
-                overflow-x: auto;
-            }
-
-            table {
-                min-width: 600px;
-            }
-
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* Map Modal */
-        #mapContainer {
-            height: 400px;
-            width: 100%;
-            border-radius: 8px;
-            z-index: 1;
+            .page-header { flex-direction: column; align-items: flex-start; }
+            .filter-bar { flex-direction: column; }
+            .filter-bar input { width: 100%; }
+            .table-container { overflow-x: auto; }
+            table { min-width: 600px; }
         }
     </style>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 
 <body>
@@ -590,53 +492,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
 
     <main class="main-content page-with-sidebar">
         <div class="page-header">
-            <h1>🚗 Motoristas</h1>
+            <h1>🚛 Carros</h1>
             <button class="btn btn-primary" onclick="openModal()">
-                ➕ Novo Motorista
+                ➕ Novo Carro
             </button>
         </div>
 
         <div class="filter-bar">
-            <input type="text" id="searchInput" placeholder="🔍 Buscar por nome..." oninput="debounceSearch()">
+            <input type="text" id="searchInput" placeholder="🔍 Buscar por descrição ou placa..." oninput="debounceSearch()">
             <select id="pageSizeSelect" onchange="onPageSizeChange()" style="padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:0.9rem;">
                 <option value="10">10 / pág</option>
                 <option value="25" selected>25 / pág</option>
                 <option value="50">50 / pág</option>
                 <option value="100">100 / pág</option>
             </select>
-            <button class="btn btn-secondary" onclick="loadMotoristas()">🔄 Atualizar</button>
+            <button class="btn btn-secondary" onclick="loadCarros()">🔄 Atualizar</button>
         </div>
 
         <div class="table-container">
             <table>
                 <thead>
                     <tr>
-                        <th data-sort="id" onclick="sortBy('id')" style="width: 60px;">
-                            ID <span class="sort-icon">↕</span>
-                        </th>
-                        <th data-sort="nome" onclick="sortBy('nome')">
-                            Nome <span class="sort-icon">↕</span>
-                        </th>
-                        <th data-sort="fone" onclick="sortBy('fone')" style="width: 140px;">
-                            Telefone <span class="sort-icon">↕</span>
-                        </th>
-                        <th data-sort="usuario" onclick="sortBy('usuario')" style="width: 120px;">
-                            Usuário <span class="sort-icon">↕</span>
-                        </th>
-                        <th>Veículo</th>
-                        <th data-sort="situacao" onclick="sortBy('situacao')" style="width: 100px;">
-                            Situação <span class="sort-icon">↕</span>
-                        </th>
+                        <th data-sort="id" onclick="sortBy('id')" style="width: 80px;">ID <span class="sort-icon">↕</span></th>
+                        <th data-sort="descricao" onclick="sortBy('descricao')">Descrição <span class="sort-icon">↕</span></th>
+                        <th data-sort="placa" onclick="sortBy('placa')" style="width: 150px;">Placa <span class="sort-icon">↕</span></th>
+                        <th data-sort="situacao" onclick="sortBy('situacao')" style="width: 120px;">Situação <span class="sort-icon">↕</span></th>
                         <th style="width: 100px;">Ações</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
-                    <tr>
-                        <td colspan="6" class="loading">🔄 Carregando...</td>
-                    </tr>
+                    <tr><td colspan="5" class="loading">🔄 Carregando...</td></tr>
                 </tbody>
             </table>
         </div>
+
         <div id="paginationBar" style="display:none; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:12px 4px;">
             <span id="paginationInfo" style="font-size:0.85rem; color:#666;"></span>
             <div id="paginationControls" style="display:flex; gap:4px; flex-wrap:wrap;"></div>
@@ -647,59 +536,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
     <div class="modal-overlay" id="modal">
         <div class="modal">
             <div class="modal-header">
-                <h2 id="modalTitle">Novo Motorista</h2>
+                <h2 id="modalTitle">Novo Carro</h2>
                 <button class="modal-close" onclick="closeModal()">×</button>
             </div>
-            <form id="motoristaForm" onsubmit="saveMotorista(event)">
+            <form id="carroForm" onsubmit="saveCarro(event)">
                 <div class="modal-body">
-                    <input type="hidden" id="motoristaId" name="id">
+                    <input type="hidden" id="carroId" name="id">
 
                     <div class="form-group">
-                        <label for="nome">Nome *</label>
-                        <input type="text" id="nome" name="nome" required placeholder="Nome completo do motorista">
+                        <label for="descricao">Descrição *</label>
+                        <input type="text" id="descricao" name="descricao" required placeholder="Ex: Mercedes-Benz Sprinter">
                     </div>
 
                     <div class="form-group">
-                        <label for="carro_id">Veículo Designado</label>
-                        <select id="carro_id" name="carro_id">
-                            <option value="">-- Nenhum veículo atribuído --</option>
+                        <label for="placa">Placa *</label>
+                        <input type="text" id="placa" name="placa" required placeholder="ABC-1234">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="situacao">Situação</label>
+                        <select id="situacao" name="situacao">
+                            <option value="a">Ativo</option>
+                            <option value="i">Inativo</option>
                         </select>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="fone">Telefone</label>
-                            <input type="text" id="fone" name="fone" placeholder="(00) 00000-0000">
-                        </div>
-                        <div class="form-group">
-                            <label for="situacao">Situação</label>
-                            <select id="situacao" name="situacao">
-                                <option value="a">Ativo</option>
-                                <option value="i">Inativo</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="usuario">Usuário</label>
-                            <input type="text" id="usuario" name="usuario" placeholder="Login do motorista">
-                        </div>
-                        <div class="form-group">
-                            <label for="senha">Senha</label>
-                            <input type="password" id="senha" name="senha" placeholder="Deixe vazio para manter">
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="latitude">Latitude</label>
-                            <input type="text" id="latitude" name="latitude" placeholder="-7.985626">
-                        </div>
-                        <div class="form-group">
-                            <label for="longitude">Longitude</label>
-                            <input type="text" id="longitude" name="longitude" placeholder="-35.049240">
-                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -718,7 +577,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                 <button class="modal-close" onclick="closeDeleteModal()">×</button>
             </div>
             <div class="modal-body">
-                <p>Deseja realmente inativar o motorista <strong id="deleteName"></strong>?</p>
+                <p>Deseja realmente inativar o carro <strong id="deleteDesc"></strong>?</p>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancelar</button>
@@ -727,37 +586,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         </div>
     </div>
 
-    <!-- Modal Mapa -->
-    <div class="modal-overlay" id="mapModal">
-        <div class="modal" style="max-width: 600px;">
-            <div class="modal-header">
-                <h2 id="mapModalTitle">🗺️ Localização</h2>
-                <button class="modal-close" onclick="closeMapModal()">×</button>
-            </div>
-            <div class="modal-body" style="padding: 16px;">
-                <div id="mapContainer"></div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeMapModal()">Fechar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast -->
     <div class="toast" id="toast"></div>
 
     <script>
         var VT_PRIMARY = '<?php echo EMPRESA_COR_PRIMARIA; ?>';
         var VT_TEXTO   = '<?php echo EMPRESA_COR_TEXTO; ?>';
 
-        // Estado
-        let currentSort = 'nome';
+        let currentSort = 'descricao';
         let currentDir  = 'ASC';
         let searchTimeout = null;
         let deleteId = null;
-        let mapInstance = null;
 
-        // ── Paginação ─────────────────────────────────────────────────────────
         let currentPage = 1;
         let pageSize    = 25;
         let totalItems  = 0;
@@ -813,55 +652,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             p = Math.max(1, Math.min(totalPages, p));
             if (p === currentPage) return;
             currentPage = p;
-            syncUrl();
-            loadMotoristas();
+            loadCarros();
         }
 
         function onPageSizeChange() {
             pageSize    = parseInt(document.getElementById('pageSizeSelect').value);
             currentPage = 1;
-            syncUrl();
-            loadMotoristas();
+            loadCarros();
         }
 
-        // ─────────────────────────────────────────────────────────────────────
+        document.addEventListener('DOMContentLoaded', () => { readUrlParams(); loadCarros(); });
 
-        let activeCarros = [];
-
-        document.addEventListener('DOMContentLoaded', () => {
-            readUrlParams();
-            loadMotoristas();
-            loadActiveCarros();
-        });
-
-        async function loadActiveCarros() {
-            try {
-                const res = await fetch('carro.php?ajax=list_active');
-                const data = await res.json();
-                if (data.success) {
-                    activeCarros = data.data;
-                    const select = document.getElementById('carro_id');
-                    const currentValue = select.value;
-                    select.innerHTML = '<option value="">-- Nenhum veículo atribuído --</option>';
-                    activeCarros.forEach(c => {
-                        const placaText = c.placa ? c.placa : 'S/ Placa';
-                        select.innerHTML += `<option value="${c.id}">${escapeHtml(c.descricao)} (${escapeHtml(placaText)})</option>`;
-                    });
-                    if (currentValue) select.value = currentValue;
-                }
-            } catch (e) {
-                console.error('Erro ao carregar carros ativos:', e);
-            }
-        }
-
-        async function loadMotoristas() {
+        async function loadCarros() {
             const search = document.getElementById('searchInput').value;
             const tbody  = document.getElementById('tableBody');
-            tbody.innerHTML = '<tr><td colspan="6" class="loading">🔄 Carregando...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="loading">🔄 Carregando...</td></tr>';
 
             const offset = (currentPage - 1) * pageSize;
             try {
-                const url = `motorista.php?ajax=list&search=${encodeURIComponent(search)}&sort=${currentSort}&dir=${currentDir}&limit=${pageSize}&offset=${offset}`;
+                const url = `carro.php?ajax=list&search=${encodeURIComponent(search)}&sort=${currentSort}&dir=${currentDir}&limit=${pageSize}&offset=${offset}`;
                 const res  = await fetch(url);
                 const data = await res.json();
 
@@ -872,36 +681,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                 syncUrl();
 
                 if (!data.data.length) {
-                    tbody.innerHTML = `
-                        <tr><td colspan="6">
-                            <div class="empty-state">
-                                <div class="icon">🚗</div>
-                                <p>Nenhum motorista encontrado</p>
-                            </div>
-                        </td></tr>`;
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:#999;">Nenhum carro encontrado</td></tr>';
                     return;
                 }
 
-                tbody.innerHTML = data.data.map(m => `
+                tbody.innerHTML = data.data.map(c => `
                     <tr>
-                        <td>${m.id}</td>
-                        <td><strong>${escapeHtml(m.nome)}</strong></td>
-                        <td>${escapeHtml(m.fone || '-')}</td>
-                        <td>${escapeHtml(m.usuario || '-')}</td>
-                        <td>${m.carro_nome ? `<strong>${escapeHtml(m.carro_nome)}</strong><br><small>${escapeHtml(m.carro_placa)}</small>` : '<span style="color:#999;font-size:0.8rem;">(Não atribuído)</span>'}</td>
+                        <td>${c.id}</td>
+                        <td><strong>${escapeHtml(c.descricao)}</strong></td>
+                        <td><code>${escapeHtml(c.placa)}</code></td>
                         <td>
-                            <span class="badge ${m.situacao === 'a' ? 'badge-success' : 'badge-danger'}">
-                                ${m.situacao === 'a' ? 'Ativo' : 'Inativo'}
+                            <span class="badge ${c.situacao === 'a' ? 'badge-success' : 'badge-danger'}">
+                                ${c.situacao === 'a' ? 'Ativo' : 'Inativo'}
                             </span>
                         </td>
                         <td>
                             <div class="actions">
-                                <button class="action-btn map ${m.latitude && m.longitude ? '' : 'disabled'}"
-                                    onclick="${m.latitude && m.longitude ? `openMapModal(${m.latitude}, ${m.longitude}, '${escapeHtml(m.nome)}')` : 'void(0)'}"
-                                    title="${m.latitude && m.longitude ? 'Ver no mapa' : 'Sem localização'}">🗺️</button>
-                                ${m.fone ? `<a class="action-btn whatsapp" href="https://wa.me/55${m.fone.replace(/\D/g,'')}" target="_blank" title="WhatsApp">💬</a>` : ''}
-                                <button class="action-btn edit" onclick="editMotorista(${m.id})" title="Editar">✏️</button>
-                                <button class="action-btn delete" onclick="openDeleteModal(${m.id}, '${escapeHtml(m.nome)}')" title="Inativar">🗑️</button>
+                                <button class="action-btn edit" onclick="editCarro(${c.id})" title="Editar">✏️</button>
+                                <button class="action-btn delete" onclick="openDeleteModal(${c.id}, '${escapeHtml(c.descricao)}')" title="Inativar">🗑️</button>
                             </div>
                         </td>
                     </tr>
@@ -909,8 +706,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
 
                 updateSortHeaders();
             } catch (e) {
-                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">❌ Erro ao carregar dados</td></tr>`;
-                showToast(e.message, 'error');
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:40px;color:red;">Erro ao carregar: ${e.message}</td></tr>`;
             }
         }
 
@@ -922,14 +718,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                 currentDir  = 'ASC';
             }
             currentPage = 1;
-            loadMotoristas();
+            loadCarros();
         }
 
         function updateSortHeaders() {
             document.querySelectorAll('th[data-sort]').forEach(th => {
                 th.classList.remove('sorted');
-                const icon = th.querySelector('.sort-icon');
-                icon.textContent = '↕';
+                th.querySelector('.sort-icon').textContent = '↕';
             });
             const activeTh = document.querySelector(`th[data-sort="${currentSort}"]`);
             if (activeTh) {
@@ -940,76 +735,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
 
         function debounceSearch() {
             clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => { currentPage = 1; loadMotoristas(); }, 300);
+            searchTimeout = setTimeout(() => { currentPage = 1; loadCarros(); }, 300);
         }
 
-        // Modal
-        function openModal(id = null) {
+        function openModal() {
             document.getElementById('modal').classList.add('active');
-            document.getElementById('motoristaId').value = id ? id : '';
-            document.getElementById('modalTitle').textContent = id ? 'Editar Motorista' : 'Novo Motorista';
-            document.getElementById('motoristaForm').reset();
-            document.getElementById('carro_id').value = '';
-            loadActiveCarros();
+            document.getElementById('modalTitle').textContent = 'Novo Carro';
+            document.getElementById('carroForm').reset();
+            document.getElementById('carroId').value = '';
         }
 
         function closeModal() {
             document.getElementById('modal').classList.remove('active');
         }
 
-        // Editar
-        async function editMotorista(id) {
+        async function editCarro(id) {
             try {
-                const res = await fetch(`motorista.php?ajax=get&id=${id}`);
+                const res  = await fetch(`carro.php?ajax=get&id=${id}`);
                 const data = await res.json();
-
                 if (!data.success) throw new Error(data.error);
 
-                const m = data.data;
-                document.getElementById('motoristaId').value = m.id;
-                document.getElementById('nome').value = m.nome;
-                document.getElementById('fone').value = m.fone || '';
-                document.getElementById('usuario').value = m.usuario || '';
-                document.getElementById('situacao').value = m.situacao;
-                document.getElementById('latitude').value = m.latitude || '';
-                document.getElementById('longitude').value = m.longitude || '';
-                document.getElementById('carro_id').value = m.carro_id || '';
-                document.getElementById('senha').value = '';
-                document.getElementById('senha').placeholder = 'Deixe vazio para manter';
+                const c = data.data;
+                document.getElementById('carroId').value = c.id;
+                document.getElementById('descricao').value = c.descricao;
+                document.getElementById('placa').value = c.placa;
+                document.getElementById('situacao').value = c.situacao;
 
-                document.getElementById('modalTitle').textContent = 'Editar Motorista';
+                document.getElementById('modalTitle').textContent = 'Editar Carro';
                 document.getElementById('modal').classList.add('active');
             } catch (e) {
                 showToast(e.message, 'error');
             }
         }
 
-        // Salvar
-        async function saveMotorista(e) {
+        async function saveCarro(e) {
             e.preventDefault();
-            const form = document.getElementById('motoristaForm');
-            const formData = new FormData(form);
-            const isEdit = !!formData.get('id');
-            formData.append('ajax', isEdit ? 'update' : 'create');
+            const id = document.getElementById('carroId').value;
+            const formData = new FormData(document.getElementById('carroForm'));
+            formData.append('ajax', id ? 'update' : 'create');
 
             try {
-                const res = await fetch('motorista.php', { method: 'POST', body: formData });
+                const res  = await fetch('carro.php', { method: 'POST', body: formData });
                 const data = await res.json();
-
                 if (!data.success) throw new Error(data.error);
 
                 showToast(data.message, 'success');
                 closeModal();
-                loadMotoristas();
+                loadCarros();
             } catch (e) {
                 showToast(e.message, 'error');
             }
         }
 
-        // Delete modal
-        function openDeleteModal(id, nome) {
+        function openDeleteModal(id, desc) {
             deleteId = id;
-            document.getElementById('deleteName').textContent = nome;
+            document.getElementById('deleteDesc').textContent = desc;
             document.getElementById('deleteModal').classList.add('active');
         }
 
@@ -1020,70 +800,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
 
         async function confirmDelete() {
             if (!deleteId) return;
+            const formData = new FormData();
+            formData.append('ajax', 'delete');
+            formData.append('id', deleteId);
 
             try {
-                const formData = new FormData();
-                formData.append('ajax', 'delete');
-                formData.append('id', deleteId);
-
-                const res = await fetch('motorista.php', { method: 'POST', body: formData });
+                const res  = await fetch('carro.php', { method: 'POST', body: formData });
                 const data = await res.json();
-
                 if (!data.success) throw new Error(data.error);
 
                 showToast(data.message, 'success');
                 closeDeleteModal();
-                loadMotoristas();
+                loadCarros();
             } catch (e) {
                 showToast(e.message, 'error');
             }
         }
 
-        // Toast
-        function showToast(message, type = 'success') {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.className = `toast ${type} show`;
-            setTimeout(() => toast.classList.remove('show'), 3000);
+        function showToast(msg, type) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = `toast show ${type}`;
+            setTimeout(() => t.classList.remove('show'), 3000);
         }
 
-        // Escape HTML
         function escapeHtml(text) {
-            if (!text) return '';
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
-        }
-
-        // Map Modal
-        function openMapModal(lat, lng, nome) {
-            document.getElementById('mapModalTitle').textContent = `🗺️ ${nome}`;
-            document.getElementById('mapModal').classList.add('active');
-            
-            // Aguarda o modal abrir para inicializar o mapa
-            setTimeout(() => {
-                if (mapInstance) {
-                    mapInstance.remove();
-                }
-                
-                mapInstance = L.map('mapContainer').setView([lat, lng], 15);
-                
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap'
-                }).addTo(mapInstance);
-                
-                L.marker([lat, lng]).addTo(mapInstance)
-                    .bindPopup(`<b>${nome}</b><br>Lat: ${lat}<br>Lng: ${lng}`)
-                    .openPopup();
-            }, 100);
-        }
-
-        function closeMapModal() {
-            document.getElementById('mapModal').classList.remove('active');
-            if (mapInstance) {
-                mapInstance.remove();
-                mapInstance = null;
-            }
         }
     </script>
 </body>

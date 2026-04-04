@@ -26,6 +26,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
         $filtroDataInicio = $_GET['data_inicio'] ?? '';
         $filtroDataFim = $_GET['data_fim'] ?? '';
         $filtroMotorista = $_GET['motorista_id'] ?? '';
+        $filtroDatas = isset($_GET['datas']) && is_array($_GET['datas'])
+            ? array_filter(array_map('trim', $_GET['datas']))
+            : [];
 
         $allowedCols = ['id', 'data_viagem', 'motorista_nome', 'situacao_nome', 'qde_pedido'];
         if (!in_array($sortCol, $allowedCols))
@@ -54,13 +57,19 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
                 LEFT JOIN remessa_situacao rs ON rs.id = v.remessa_situacao_id
                 WHERE 1=1";
 
-        if (!empty($filtroDataInicio)) {
-            $sql .= " AND DATE(v.data_viagem) >= :data_inicio";
-            $params[':data_inicio'] = $filtroDataInicio;
-        }
-        if (!empty($filtroDataFim)) {
-            $sql .= " AND DATE(v.data_viagem) <= :data_fim";
-            $params[':data_fim'] = $filtroDataFim;
+        if (!empty($filtroDatas)) {
+            $placeholders = implode(',', array_fill(0, count($filtroDatas), '?'));
+            $sql .= " AND DATE(v.data_viagem) IN ({$placeholders})";
+            foreach ($filtroDatas as $d) $params[] = $d;
+        } else {
+            if (!empty($filtroDataInicio)) {
+                $sql .= " AND DATE(v.data_viagem) >= :data_inicio";
+                $params[':data_inicio'] = $filtroDataInicio;
+            }
+            if (!empty($filtroDataFim)) {
+                $sql .= " AND DATE(v.data_viagem) <= :data_fim";
+                $params[':data_fim'] = $filtroDataFim;
+            }
         }
         if (!empty($filtroMotorista)) {
             $sql .= " AND v.motorista_id = :motorista_id";
@@ -85,13 +94,19 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
                 WHERE 1=1";
         // Rebuild WHERE conditions for count
         $countParams = [];
-        if (!empty($filtroDataInicio)) {
-            $countSql .= " AND DATE(v.data_viagem) >= :data_inicio";
-            $countParams[':data_inicio'] = $filtroDataInicio;
-        }
-        if (!empty($filtroDataFim)) {
-            $countSql .= " AND DATE(v.data_viagem) <= :data_fim";
-            $countParams[':data_fim'] = $filtroDataFim;
+        if (!empty($filtroDatas)) {
+            $placeholders = implode(',', array_fill(0, count($filtroDatas), '?'));
+            $countSql .= " AND DATE(v.data_viagem) IN ({$placeholders})";
+            foreach ($filtroDatas as $d) $countParams[] = $d;
+        } else {
+            if (!empty($filtroDataInicio)) {
+                $countSql .= " AND DATE(v.data_viagem) >= :data_inicio";
+                $countParams[':data_inicio'] = $filtroDataInicio;
+            }
+            if (!empty($filtroDataFim)) {
+                $countSql .= " AND DATE(v.data_viagem) <= :data_fim";
+                $countParams[':data_fim'] = $filtroDataFim;
+            }
         }
         if (!empty($filtroMotorista)) {
             $countSql .= " AND v.motorista_id = :motorista_id";
@@ -114,13 +129,19 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
                      LEFT JOIN remessa_situacao rs ON rs.id = v.remessa_situacao_id
                      WHERE 1=1";
         $statsParams = [];
-        if (!empty($filtroDataInicio)) {
-            $statsSql .= " AND DATE(v.data_viagem) >= :data_inicio";
-            $statsParams[':data_inicio'] = $filtroDataInicio;
-        }
-        if (!empty($filtroDataFim)) {
-            $statsSql .= " AND DATE(v.data_viagem) <= :data_fim";
-            $statsParams[':data_fim'] = $filtroDataFim;
+        if (!empty($filtroDatas)) {
+            $placeholders = implode(',', array_fill(0, count($filtroDatas), '?'));
+            $statsSql .= " AND DATE(v.data_viagem) IN ({$placeholders})";
+            foreach ($filtroDatas as $d) $statsParams[] = $d;
+        } else {
+            if (!empty($filtroDataInicio)) {
+                $statsSql .= " AND DATE(v.data_viagem) >= :data_inicio";
+                $statsParams[':data_inicio'] = $filtroDataInicio;
+            }
+            if (!empty($filtroDataFim)) {
+                $statsSql .= " AND DATE(v.data_viagem) <= :data_fim";
+                $statsParams[':data_fim'] = $filtroDataFim;
+            }
         }
         if (!empty($filtroMotorista)) {
             $statsSql .= " AND v.motorista_id = :motorista_id";
@@ -150,6 +171,26 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'list') {
                 'totalPedidos' => $statsResult ? intval($statsResult['total_pedidos']) : 0
             ]
         ]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// AJAX: Listar datas disponíveis com contagem
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'datas') {
+    header('Content-Type: application/json');
+    try {
+        $limit = intval($_GET['limit'] ?? 30);
+        $rows = $db->query(
+            "SELECT DATE(v.data_viagem) as data, COUNT(*) as total
+             FROM viagem v
+             GROUP BY DATE(v.data_viagem)
+             ORDER BY data DESC
+             LIMIT :lim",
+            [':lim' => $limit]
+        );
+        echo json_encode(['success' => true, 'data' => $rows, 'hasMore' => count($rows) === $limit]);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
@@ -306,7 +347,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Viagens - Victor Transportes</title>
+    <title>Viagens - <?php echo EMPRESA_NOME; ?></title>
     <style>
         :root {
             --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>;
@@ -888,6 +929,107 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             color: var(--text-muted);
             font-size: 0.85rem;
         }
+
+        /* Layout com painel de datas */
+        .page-layout {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+
+        /* Painel de datas */
+        .date-panel {
+            width: 220px;
+            flex-shrink: 0;
+            background: var(--card);
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            overflow: hidden;
+            position: sticky;
+            top: 20px;
+        }
+
+        .date-panel-header {
+            background: var(--primary);
+            color: #fff;
+            padding: 10px 14px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .date-panel-header .toggle-icon {
+            transition: transform 0.2s;
+            font-style: normal;
+        }
+
+        .date-panel.collapsed .toggle-icon { transform: rotate(-90deg); }
+        .date-panel.collapsed .date-panel-body { display: none; }
+
+        .date-panel-body { padding: 6px 0; max-height: 70vh; overflow-y: auto; }
+
+        .date-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .date-item:hover { background: var(--primary-bg); }
+
+        .date-item input[type=checkbox] {
+            accent-color: var(--primary);
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+        }
+
+        .date-item label {
+            flex: 1;
+            cursor: pointer;
+            color: var(--text);
+        }
+
+        .date-count {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .date-panel-footer {
+            padding: 8px 14px;
+            border-top: 1px solid var(--border);
+        }
+
+        .date-panel-footer button {
+            width: 100%;
+            padding: 6px;
+            font-size: 0.78rem;
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--primary);
+            font-weight: 600;
+            transition: background 0.15s;
+        }
+
+        .date-panel-footer button:hover { background: var(--primary-bg); }
+
+        .page-main { flex: 1; min-width: 0; }
+
+        @media (max-width: 768px) {
+            .page-layout { flex-direction: column; }
+            .date-panel { width: 100%; position: static; }
+        }
     </style>
 </head>
 
@@ -927,6 +1069,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             </div>
         </div>
 
+        <div class="page-layout">
+        <!-- Painel de Datas -->
+        <div class="date-panel" id="datePanel">
+            <div class="date-panel-header" onclick="toggleDatePanel()">
+                ▼ DATA VIAGEM
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div class="date-panel-body" id="datePanelBody">
+                <div class="date-item" style="color:var(--text-muted);font-size:0.8rem;padding:10px 14px;">🔄 Carregando...</div>
+            </div>
+            <div class="date-panel-footer" id="datePanelFooter" style="display:none">
+                <button onclick="loadMoreDates()">+ Ver todos</button>
+            </div>
+        </div>
+
+        <div class="page-main">
         <div class="filter-bar">
             <div class="filter-row">
                 <div class="filter-group" style="max-width:180px;">
@@ -989,6 +1147,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             <div class="pagination-info" id="paginationInfo"></div>
             <div class="pagination-controls" id="paginationControls"></div>
         </div>
+        </div><!-- .page-main -->
+        </div><!-- .page-layout -->
     </main>
 
     <!-- Modal Criar/Editar -->
@@ -1015,8 +1175,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                     </div>
 
                     <div class="form-group">
-                        <label for="remessa_situacao_id">Situação da Viagem</label>
-                        <select id="remessa_situacao_id" name="remessa_situacao_id">
+                        <label for="remessa_situacao_id">Situação da Viagem *</label>
+                        <select id="remessa_situacao_id" name="remessa_situacao_id" required>
                             <option value="">Selecione a situação...</option>
                         </select>
                     </div>
@@ -1064,8 +1224,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
         let currentPage = 1;
         const PER_PAGE = 20;
 
+        // Estado painel de datas
+        let datesLimit = 30;
+        let selectedDates = new Set();
+
+        // ===== PAINEL DE DATAS =====
+        function toggleDatePanel() {
+            document.getElementById('datePanel').classList.toggle('collapsed');
+        }
+
+        async function loadDatePanel(limit) {
+            limit = limit || datesLimit;
+            const body = document.getElementById('datePanelBody');
+            try {
+                const res = await fetch(`viagem.php?ajax=datas&limit=${limit}`);
+                const data = await res.json();
+                if (!data.success) return;
+
+                body.innerHTML = data.data.map(row => {
+                    const d = row.data;
+                    const label = formatDate(d);
+                    const checked = selectedDates.has(d) ? 'checked' : '';
+                    return `<div class="date-item">
+                        <input type="checkbox" id="dt-${d}" value="${d}" ${checked} onchange="toggleDate('${d}')">
+                        <label for="dt-${d}">${label}</label>
+                        <span class="date-count">(${row.total})</span>
+                    </div>`;
+                }).join('');
+
+                const footer = document.getElementById('datePanelFooter');
+                footer.style.display = data.hasMore ? 'block' : 'none';
+            } catch(e) { console.error(e); }
+        }
+
+        function toggleDate(date) {
+            if (selectedDates.has(date)) selectedDates.delete(date);
+            else selectedDates.add(date);
+            currentPage = 1;
+            loadViagens();
+        }
+
+        function loadMoreDates() {
+            datesLimit = 9999;
+            loadDatePanel(9999);
+        }
+
         // ===== INIT =====
         document.addEventListener('DOMContentLoaded', () => {
+            loadDatePanel();
             setDefaultDates();
             loadFilterMotoristas();
             loadViagens();
@@ -1135,6 +1341,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             document.getElementById('filterDataFim').value = '';
             document.getElementById('filterMotorista').innerHTML = '<option value="">Todos os motoristas</option>';
             document.getElementById('searchInput').value = '';
+            selectedDates.clear();
+            loadDatePanel();
             currentPage = 1;
             setDefaultDates();
             loadFilterMotoristas();
@@ -1162,6 +1370,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
                     const select = document.getElementById('remessa_situacao_id');
                     select.innerHTML = '<option value="">Selecione a situação...</option>' +
                         sitData.data.map(s => `<option value="${s.id}">${escapeHtml(s.descricao)}</option>`).join('');
+                    // Selecionar "Não Entregue" como padrão
+                    const naoEntregue = sitData.data.find(s => s.descricao.toLowerCase().includes('não entregue'));
+                    if (naoEntregue && !document.getElementById('viagemId').value) {
+                        select.value = naoEntregue.id;
+                    }
                 }
             } catch (e) {
                 console.error('Erro ao carregar dados dos selects:', e);
@@ -1179,8 +1392,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
 
             try {
                 let url = `viagem.php?ajax=list&search=${encodeURIComponent(search)}&sort=${currentSort}&dir=${currentDir}&page=${currentPage}`;
-                if (dataInicio) url += `&data_inicio=${dataInicio}`;
-                if (dataFim) url += `&data_fim=${dataFim}`;
+                if (selectedDates.size > 0) {
+                    selectedDates.forEach(d => url += `&datas[]=${d}`);
+                } else {
+                    if (dataInicio) url += `&data_inicio=${dataInicio}`;
+                    if (dataFim) url += `&data_fim=${dataFim}`;
+                }
                 if (motorista) url += `&motorista_id=${motorista}`;
 
                 const res = await fetch(url);
@@ -1349,6 +1566,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax']) && $_POST['aj
             // Set today's date as default for new viagem
             if (!id) {
                 document.getElementById('data_viagem').value = new Date().toISOString().split('T')[0];
+                // Selecionar "Não Entregue" como padrão
+                const naoEntregue = situacoesCache.find(s => s.descricao.toLowerCase().includes('não entregue'));
+                if (naoEntregue) document.getElementById('remessa_situacao_id').value = naoEntregue.id;
             }
         }
 

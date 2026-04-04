@@ -86,6 +86,8 @@
         initSubmenu('vt_submenu_fornecedor', 'fornecedorToggle', 'fornecedorSubmenu');
         // Relatórios submenu
         initSubmenu('vt_submenu_relatorios', 'relatoriosToggle', 'relatoriosSubmenu');
+        // Cadastros Gerais submenu
+        initSubmenu('vt_submenu_cadastros_gerais', 'cadastrosGeraisToggle', 'cadastrosGeraisSubmenu');
     }
 
     /**

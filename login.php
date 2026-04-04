@@ -78,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Victor Transportes</title>
+    <title>Login - <?php echo EMPRESA_NOME; ?></title>
     <style>
         :root {
             --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>;
@@ -244,7 +244,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="login-container">
         <div class="login-header">
             <div class="icon">🚚</div>
-            <h1>Victor Transportes</h1>
+            <h1><?php echo EMPRESA_NOME; ?></h1>
             <p>Sistema de Gestão Logística</p>
         </div>
 
@@ -273,7 +273,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <button type="submit" class="btn-login">Entrar</button>
 
-            <p class="footer-text">© 2026 Victor Transportes</p>
+            <p class="footer-text">© 2026 <?php echo EMPRESA_NOME; ?></p>
         </form>
     </div>
 

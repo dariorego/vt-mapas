@@ -20,7 +20,7 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Victor Transportes - Sistema de Gestão</title>
+    <title><?php echo EMPRESA_NOME; ?> - Sistema de Gestão</title>
     <style>
         :root {
             --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>;
@@ -653,7 +653,7 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
         <div class="sidebar-header">
             <span class="sidebar-logo">🚚</span>
             <div class="sidebar-brand">
-                <h1>Victor Transportes</h1>
+                <h1><?php echo EMPRESA_NOME; ?></h1>
                 <p>Sistema de Gestão</p>
             </div>
         </div>
@@ -682,6 +682,10 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
                     <span class="icon">🚗</span>
                     <span class="label">Motoristas</span>
                 </div>
+                <div class="nav-item" data-page="carro.php" data-title="Carros" data-icon="🚛">
+                    <span class="icon">🚛</span>
+                    <span class="label">Carros</span>
+                </div>
                 <div class="nav-item" data-page="cliente.php" data-title="Clientes" data-icon="👥">
                     <span class="icon">👥</span>
                     <span class="label">Clientes</span>
@@ -689,6 +693,31 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
                 <div class="nav-item" data-page="fornecedor.php" data-title="Fornecedores" data-icon="🏭">
                     <span class="icon">🏭</span>
                     <span class="label">Fornecedores</span>
+                </div>
+            </div>
+
+            <!-- Cadastros Gerais Submenu -->
+            <button class="nav-submenu-toggle" data-submenu="cadastrosGeraisSubmenu">
+                <span class="icon">🗂️</span>
+                <span class="label">Cadastros Gerais</span>
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+                <span class="tooltip">Cadastros Gerais</span>
+            </button>
+            <div class="nav-submenu" id="cadastrosGeraisSubmenu">
+                <div class="nav-item" data-page="remessa_situacao.php" data-title="Situação Remessa" data-icon="📋">
+                    <span class="icon">📋</span>
+                    <span class="label">Situação Remessa</span>
+                </div>
+                <div class="nav-item" data-page="cidade.php" data-title="Cidades" data-icon="🏙️">
+                    <span class="icon">🏙️</span>
+                    <span class="label">Cidades</span>
+                </div>
+                <div class="nav-item" data-page="forma_pagamento.php" data-title="Forma de Pagamento" data-icon="💳">
+                    <span class="icon">💳</span>
+                    <span class="label">Forma de Pagamento</span>
                 </div>
             </div>
 
@@ -783,7 +812,7 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
         </div>
 
         <div class="sidebar-footer">
-            © 2026 Victor Transportes
+            © 2026 <?php echo EMPRESA_NOME; ?>
         </div>
     </aside>
 
@@ -792,7 +821,7 @@ $userName = $_SESSION['user_name'] ?? 'Usuário';
         <!-- Mobile Header -->
         <div class="mobile-header">
             <button onclick="openMobileSidebar()">☰</button>
-            <span>Victor Transportes</span>
+            <span><?php echo EMPRESA_NOME; ?></span>
         </div>
 
         <!-- Tabs Bar -->

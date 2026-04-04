@@ -30,6 +30,10 @@ $allCards = [
         'titulo' => 'Clientes', 'descricao' => 'Gerencie o cadastro de clientes, contatos e localizações.',
         'icone' => '👥', 'link' => 'cliente.php', 'cor' => '#8B5CF6', 'ordem' => 4, 'admin_only' => false
     ],
+    'carros' => [
+        'titulo' => 'Carros', 'descricao' => 'Cadastro e gestão da frota de veículos.',
+        'icone' => '🚛', 'link' => 'carro.php', 'cor' => '#6366F1', 'ordem' => 4.5, 'admin_only' => false
+    ],
     'viagens' => [
         'titulo' => 'Relação de Viagem', 'descricao' => 'Acompanhe viagens, atribua motoristas e controle entregas.',
         'icone' => '🚐', 'link' => 'viagem.php', 'cor' => '#EC4899', 'ordem' => 5, 'admin_only' => false
@@ -80,7 +84,7 @@ if (!empty($savedConfig)) {
     }
 } else {
     // Fallback: cards originais
-    $defaults = ['gerar_rota', 'validar_fornecedor', 'sobre'];
+    $defaults = ['gerar_rota', 'validar_fornecedor', 'carros', 'sobre'];
     foreach ($defaults as $key) {
         $card = $allCards[$key];
         if ($card['admin_only'] && !$isAdmin) continue;
@@ -100,7 +104,7 @@ if (!empty($savedConfig)) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Victor Transportes - Sistema de Gestão</title>
+    <title><?php echo EMPRESA_NOME; ?> - Sistema de Gestão</title>
     <style>
         :root {
             --primary: <?php echo EMPRESA_COR_PRIMARIA; ?>;
